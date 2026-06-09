@@ -9,6 +9,7 @@ from money_handling.WinnersSelector import WenzToutWinnersSelector
 if TYPE_CHECKING:
     from money_handling.GameValueCalculator import GameValueCalculator
     from player_classes.Player import Player
+    from player_classes.Team import Team
     from money_handling.WinnersSelector import WinnersSelector
     from game_classes.RoundManager import RoundManager
 
@@ -36,8 +37,10 @@ class WenzTout(Wenz):
             full_deck=self.cards.full_deck.copy(),
         )
 
-    def tell_most_point_teams(self, winners_selector: WinnersSelector) -> None:
-        return
+    def get_most_point_teams_for_result(
+        self, winners_selector: WinnersSelector
+    ) -> list[Team]:
+        return []
 
     def create_game_value_calculator(
         self, winners: list[Player]

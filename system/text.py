@@ -6,7 +6,6 @@ if TYPE_CHECKING:
     from player_classes.Player import Player
     from player_classes.Team import Team
     from game_classes.Game import Game
-    from money_handling.GameValueCalculator import GameValueCalculator
 
 
 # regular text
@@ -21,11 +20,6 @@ def show_player_cards(player_name: str, player_cards: list[Card]) -> str:
 
 def show_played_card(player_name: str, decision: Card) -> str:
     return f"\n{player_name} played the card: {decision.card_name}"
-
-
-def show_played_cards(played_cards: list[Card]) -> str:
-    played_card_names = [card.card_name for card in played_cards]
-    return f"The played cards are: {" | ".join(played_card_names)}"
 
 
 def show_collector_of_cards(player_name: str, collected_cards: list[Card]) -> str:
@@ -63,13 +57,8 @@ def tell_winners(winners: list[Player]) -> str:
         return f"\nThe game winners are: {", ".join(winner_names)}"
 
 
-def tell_game_value_calculation(
-    gv_calculator: GameValueCalculator,
-    game_value: int,
-) -> str:
-    return (
-        gv_calculator.game_value_breakdown() + f"\n\nThe game value is: {game_value}\n"
-    )
+def tell_game_value_calculation(breakdown: str, game_value: int) -> str:
+    return breakdown + f"\n\nThe game value is: {game_value}\n"
 
 
 def tell_player_money(player_name: str, money: int) -> str:
@@ -133,22 +122,9 @@ def prompt_ask_player_shoots_back(player_name: str) -> str:
     return f"{player_name}: Do you want to shoot back? (Y/N): "
 
 
-def prompt_ask_swap_card_decision(
-    player_name: str,
-    player_cards: list[Card],
-    is_game_chooser: bool,
-    trumps: list[Card],
-) -> str:
-    if is_game_chooser:
-        legal_cards: list[Card] = [card for card in player_cards if card in trumps]
-    else:
-        legal_cards: list[Card] = [card for card in player_cards if card not in trumps]
-
-    # the player_cards are sorted -> trumps on the left, non-trumps on the right
-    first_legal_index: int = player_cards.index(legal_cards[0])
-    last_legal_index: int = (
-        len(player_cards) - 1 - player_cards[::-1].index(legal_cards[-1])
-    )
+def prompt_ask_swap_card_decision(player_name: str, legal_mask: list[bool]) -> str:
+    first_legal_index: int = legal_mask.index(True)
+    last_legal_index: int = len(legal_mask) - 1 - legal_mask[::-1].index(True)
     if first_legal_index == last_legal_index:
         return f"{player_name}: Which card do you want to swap? ({first_legal_index + 1}): "
     else:

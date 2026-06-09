@@ -2,7 +2,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
-from game_classes.GameRenderer import GameRenderer
 from game_classes.RoundManager import RoundManager
 from money_handling.WinnersSelector import WinnersSelector
 from player_classes.Team import Team
@@ -12,6 +11,7 @@ from game_classes.RunnersCalculator import (
 )
 from card_classes.CardPowerCalculator import CardPowerCalculator
 from input_validators.CardDecisionValidator import CardDecisionValidator
+from system.Renderer import GameResult
 
 from money_handling.MoneyDistributer import MoneyDistributer
 
@@ -63,7 +63,7 @@ class Game(ABC):
         self.card_power_calculator: CardPowerCalculator = card_power_calculator
         self.card_decision_validator: CardDecisionValidator = card_decision_validator
         self.runners_calculator: type[RunnersCalculator] = runners_calculator
-        self.game_renderer: GameRenderer = GameRenderer(renderer=renderer)
+        self.renderer: Renderer = renderer
         self.amount_game_value_doubles: int = amount_game_value_doubles
         self.players: list[Player] = players
         self.trumps: list[Card] = [
@@ -117,7 +117,7 @@ class Game(ABC):
             card_power_calculator=self.card_power_calculator,
             card_decision_validator=self.card_decision_validator,
             active_team=self.active_team,
-            game_renderer=self.game_renderer,
+            renderer=self.renderer,
         )
 
     def create_winners_selector(self) -> WinnersSelector:
@@ -176,14 +176,12 @@ class Game(ABC):
         )
         self.runners_amount: int = runners_setup.runners_amount
 
-    def tell_most_point_teams(self, winners_selector: WinnersSelector) -> None:
-        most_point_teams: list[Team] = winners_selector.get_most_points_teams()
-        self.game_renderer.render_most_point_teams(most_point_teams=most_point_teams)
-        for team in most_point_teams:
-            self.game_renderer.render_team_points(team=team)
-            self.game_renderer.render_team_players(team=team)
+    def get_most_point_teams_for_result(
+        self, winners_selector: WinnersSelector
+    ) -> list[Team]:
+        return winners_selector.get_most_points_teams()
 
-    def handle_winners(self):
+    def handle_winners(self) -> None:
         """
         Creates an object that selects the winners.
         Creates another object after to distribute the money among the players.
@@ -192,22 +190,25 @@ class Game(ABC):
 
         winners_selector: WinnersSelector = self.create_winners_selector()
         winners: list[Player] = winners_selector.get_game_winners()
-        self.tell_most_point_teams(winners_selector=winners_selector)
-        self.game_renderer.render_winners(winners=winners)
+        most_point_teams: list[Team] = self.get_most_point_teams_for_result(
+            winners_selector=winners_selector
+        )
         gv_calculator: GameValueCalculator = self.create_game_value_calculator(
             winners=winners
         )
         game_value: int = gv_calculator.calculate_game_value()
-        money_distributer: MoneyDistributer = MoneyDistributer()
-        money_distributer.distribute_money(
+        MoneyDistributer.distribute_money(
             game_value=game_value, winners=winners, players=self.players
         )
-        self.game_renderer.render_game_value_calculation(
-            gv_calculator=gv_calculator,
-            game_value=game_value,
+        self.renderer.render_game_result(
+            result=GameResult(
+                most_point_teams=most_point_teams,
+                winners=winners,
+                game_value=game_value,
+                game_value_breakdown=gv_calculator.game_value_breakdown(),
+                players=self.players,
+            )
         )
-        for player in self.players:
-            self.game_renderer.render_player_money(player=player)
 
     def play_game(self) -> None:
         """

@@ -21,10 +21,6 @@ from system.custom_exceptions import (
     PlayerIsNotInPlayersListError,
 )
 from system.text import (
-    error_message,
-    prompt_player_name,
-    prompt_play_again_message,
-    show_player_cards,
     words_of_thanks,
     no_game_phrase,
 )
@@ -61,12 +57,7 @@ class Schafkopf:
     def _create_players(self) -> list[Player]:
         players: list[Player] = []
 
-        player_name = self.renderer.ask_with_validation(
-            prompt=prompt_player_name,
-            error_prefix=error_message,
-            preprocess=lambda x: x.strip().capitalize(),
-            validator=lambda x: x != "",
-        )
+        player_name = self.renderer.ask_player_name()
         players.append(
             Player(
                 player_name=player_name,
@@ -210,11 +201,7 @@ class Schafkopf:
             self.prepare_players()
             self.prepare_cards()
             for player in self.players:
-                self.renderer.render(
-                    message=show_player_cards(
-                        player_name=player.player_name, player_cards=player.player_cards
-                    )
-                )
+                self.renderer.render_hand(player=player, cards=player.player_cards)
                 if player.ask_want_choose_game():
                     self.game_choosers.append(player)
             game: Game | None = self.players_choose_game()
@@ -226,13 +213,7 @@ class Schafkopf:
             self.starter = self.get_new_starter(
                 prev_starter_index=self.players.index(self.starter)
             )
-            play_again_decision: str = self.renderer.ask_with_validation(
-                prompt=prompt_play_again_message,
-                error_prefix=error_message,
-                preprocess=lambda x: x.strip().upper(),
-                validator=lambda x: x in ("YES", "Y", "NO", "N"),
-            )
-            if play_again_decision in ("NO", "N"):
+            if not self.renderer.ask_play_again():
                 break
 
         self.renderer.render(message=words_of_thanks)

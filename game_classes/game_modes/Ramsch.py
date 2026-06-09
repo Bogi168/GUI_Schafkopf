@@ -92,7 +92,7 @@ class Ramsch(Game):
             trumps=self.trumps,
             card_power_calculator=self.card_power_calculator,
             card_decision_validator=self.card_decision_validator,
-            game_renderer=self.game_renderer,
+            renderer=self.renderer,
         )
 
     def create_winners_selector(self) -> WinnersSelector:

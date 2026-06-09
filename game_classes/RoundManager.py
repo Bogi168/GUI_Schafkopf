@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from card_classes.Cards import Card
     from card_classes.CardPowerCalculator import CardPowerCalculator
     from input_validators.CardDecisionValidator import CardDecisionValidator
-    from game_classes.GameRenderer import GameRenderer
+    from system.Renderer import Renderer
 
 
 class RoundManager:
@@ -20,7 +20,7 @@ class RoundManager:
         card_power_calculator: CardPowerCalculator,
         card_decision_validator: CardDecisionValidator,
         active_team: Team | None,
-        game_renderer: GameRenderer,
+        renderer: Renderer,
     ) -> None:
         self.players: list[Player] = players
         self.player_teams: dict[Player, Team] = player_teams
@@ -28,7 +28,7 @@ class RoundManager:
         self.active_team: Team | None = active_team
         self.card_power_calculator: CardPowerCalculator = card_power_calculator
         self.card_decision_validator: CardDecisionValidator = card_decision_validator
-        self.game_renderer: GameRenderer = game_renderer
+        self.renderer: Renderer = renderer
         self.played_cards: list[Card] = []
         self.amt_game_val_doubles: int = 0
 
@@ -71,7 +71,7 @@ class RoundManager:
             ),
         )
         self.played_cards.append(card_decision)
-        self.game_renderer.render_played_cards(played_cards=self.played_cards)
+        self.renderer.render_played_card(player=player, card=card_decision)
 
     def get_round_winner(self) -> Player:
         strongest_card: Card = self.card_power_calculator.get_strongest_played_card(
@@ -84,7 +84,7 @@ class RoundManager:
     def reward_round_winner(self, round_winner: Player) -> None:
         for card in self.played_cards:
             round_winner.collected_cards.append(card)
-        self.game_renderer.render_collector_of_cards(collector=round_winner)
+        self.renderer.render_trick_winner(winner=round_winner)
 
     def sort_players(self, starter: Player) -> None:
         """
@@ -131,7 +131,7 @@ class RamschRoundManager(RoundManager):
         trumps: list[Card],
         card_power_calculator: CardPowerCalculator,
         card_decision_validator: CardDecisionValidator,
-        game_renderer: GameRenderer,
+        renderer: Renderer,
     ) -> None:
         super().__init__(
             players=players,
@@ -140,7 +140,7 @@ class RamschRoundManager(RoundManager):
             card_power_calculator=card_power_calculator,
             card_decision_validator=card_decision_validator,
             active_team=None,
-            game_renderer=game_renderer,
+            renderer=renderer,
         )
         self.active_players: list[Player] = []
 

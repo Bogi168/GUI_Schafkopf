@@ -88,8 +88,6 @@ class Hochzeit(Game):
                 move_validator=lambda d: self.card_decision_validator.is_card_swap_legal(
                     is_game_chooser=is_game_chooser, decision=d
                 ),
-                trumps=self.trumps,
-                is_game_chooser=is_game_chooser,
             )
             swap_cards.append(decision)
 
