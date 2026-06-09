@@ -26,6 +26,14 @@ python3 -m pytest tests/test_card_decision_validator.py
 python3 -m pytest tests/test_card_decision_validator.py::test_name
 ```
 
+## Git workflow
+
+After completing any meaningful unit of work — a bug fix, a new feature, a refactor — commit the changes and push to GitHub immediately. This ensures there is always a recoverable state on the remote.
+
+- Commit only the files relevant to the change; do not use `git add .` blindly.
+- Write commit messages in the imperative mood and keep the subject line under 72 characters. Add a short body when the *why* is not obvious from the diff.
+- Push every commit to `origin/main` straight away — do not batch multiple commits before pushing.
+
 ## Architecture
 
 The game is orchestrated by `schafkopf_classes/Schafkopf.py`, which owns the main loop, deals cards, collects game-mode choices, and fires `game.play_game()`. One human `Player` and three `Bot` instances are created at startup; the `Bot` subclass overrides only the card-playing, shooting, and doubling decisions — game-mode selection methods are **not** overridden and currently fall through to the human prompts (a known gap).
