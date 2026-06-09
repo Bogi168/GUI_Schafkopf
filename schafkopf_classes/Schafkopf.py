@@ -183,9 +183,11 @@ class Schafkopf:
                 else:
                     decision = player.choose_game_mode(
                         prev_game_mode=game_mode,
+                        quitting_possible=True,
                     )
-                    game_mode = decision
-                    game_chooser = player
+                    if decision is not None:
+                        game_mode = decision
+                        game_chooser = player
 
                 if game_mode is SoloTout:
                     break
