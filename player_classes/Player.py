@@ -362,6 +362,37 @@ class Bot(Player):
     def ask_double_game_value(self) -> bool:
         return False
 
+    def ask_want_choose_game(self) -> bool:
+        return True
+
+    def choose_game_mode(
+        self,
+        prev_game_mode: type[Game] | None,
+        quitting_possible: bool = False,
+    ) -> type[Game] | None:
+        if quitting_possible:
+            return None
+        valid = self.game_decision_validator.get_valid_game_mode_decisions(
+            prev_game_mode=prev_game_mode, player_cards=self.player_cards
+        )
+        return random.choice(list(valid.values()))
+
+    def get_sau_color(self) -> Color:
+        valid = self.game_decision_validator.get_valid_call_sau_color_inputs(
+            player_cards=self.player_cards
+        )
+        return random.choice(list(valid.values()))
+
+    def get_trump_color(self) -> Color:
+        valid = self.game_decision_validator.get_valid_solo_color_inputs()
+        return random.choice(list(valid.values()))
+
+    def ask_for_hochzeit(self) -> bool:
+        return False
+
+    def ask_for_ramsch(self) -> bool:
+        return False
+
     def get_card_play_decision(
         self,
         move_validator: Callable[[Card], bool],
