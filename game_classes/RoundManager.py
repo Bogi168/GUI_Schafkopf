@@ -112,14 +112,11 @@ class RoundManager:
         :return: None
         """
 
-        if is_first_round:
-            shooting_happened: bool = True
-        else:
-            shooting_happened: bool = False
+        shooting_possible: bool = is_first_round
 
         for player in self.players:
-            if shooting_happened:
-                shooting_happened: bool = self.handle_shooting(
+            if shooting_possible:
+                shooting_possible = self.handle_shooting(
                     players_team=self.player_teams[player], player=player
                 )
             self.play_card(player=player)
