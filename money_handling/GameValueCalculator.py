@@ -56,7 +56,6 @@ class GameValueCalculator(ABC):
             amount_game_card_points // 4
         )  # If total amount of points is 120, then schneider threshold is at 90 (75%)
         self.black_threshold: int = amount_game_card_points
-        self.black = False
 
     def is_schneider(self) -> bool:
         winning_team = self.player_teams[self.winners[0]]
