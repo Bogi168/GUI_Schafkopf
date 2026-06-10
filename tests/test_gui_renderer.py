@@ -111,9 +111,11 @@ def test_previous_round_button_toggles_and_dismisses_on_click(renderer, eichel_s
     assert renderer.state.show_previous_round is False
 
 
-def test_previous_round_button_disabled_when_no_round_played(renderer):
+def test_previous_round_button_hidden_when_no_round_played(renderer):
     renderer.state.previous_round_cards = []
     renderer._draw((0, 0))
+
+    assert renderer._previous_round_button is None
 
     button_pos = c.PREVIOUS_ROUND_BUTTON_RECT.center
     renderer._handle_click(button_pos)

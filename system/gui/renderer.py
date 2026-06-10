@@ -637,11 +637,14 @@ class GUIRenderer(Renderer):
             draw_card_face(self.screen, rect, entry.card, self.fonts)
 
     def _draw_previous_round_button(self, mouse_pos: tuple[int, int]) -> None:
+        if not self.state.previous_round_cards:
+            self._previous_round_button = None
+            return
+
         label = "Hide last round" if self.state.show_previous_round else "Show last round"
         button = Button(
             rect=c.PREVIOUS_ROUND_BUTTON_RECT,
             label=label,
-            enabled=bool(self.state.previous_round_cards),
         )
         button.draw(self.screen, self.fonts, mouse_pos)
         self._previous_round_button = button
