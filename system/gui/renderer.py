@@ -282,6 +282,7 @@ class GUIRenderer(Renderer):
         )
         with self.lock:
             self.state.game_result = None
+            self.state.message = ""
         return result
 
     def ask_yes_no(self, player: Player, kind: YesNoKind, allow_yes: bool = True) -> bool:

@@ -9,6 +9,7 @@ from system.gui import constants as c
 from system.gui.renderer import GUIRenderer
 from system.gui.state import PlayedCardEntry
 from system.Renderer import GameResult
+from system.text import no_game_phrase
 
 
 @pytest.fixture
@@ -96,6 +97,15 @@ def test_render_game_mode_none_resets_previous_round(renderer, eichel_sau):
 
     assert renderer.state.previous_round_cards == []
     assert renderer.state.show_previous_round is False
+
+
+def test_ask_play_again_clears_no_game_message(renderer, monkeypatch):
+    renderer.state.message = no_game_phrase.strip()
+    monkeypatch.setattr(renderer, "_request", lambda **_kwargs: True)
+
+    renderer.ask_play_again()
+
+    assert renderer.state.message == ""
 
 
 def test_previous_round_button_toggles_and_dismisses_on_click(renderer, eichel_sau):
