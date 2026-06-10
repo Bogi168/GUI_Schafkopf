@@ -1,0 +1,659 @@
+"""A pygame-based Renderer implementation.
+
+Game logic (the background thread running Schafkopf.main) talks to this
+class exclusively through the Renderer interface (render_*/ask_* methods).
+Those methods only ever mutate `self.state` under `self.lock`. The pygame
+event/draw loop runs on the main thread in `run()` and reads `self.state`
+to draw the table, never touching game objects directly except for the
+read-only `Player.money` attribute used for the live money display.
+"""
+
+from __future__ import annotations
+
+import os
+import random
+import threading
+import time
+import traceback
+from typing import TYPE_CHECKING, Any, Callable
+
+import pygame
+
+from system.Renderer import ColorChoiceKind, Renderer, YesNoKind
+from system.gui import constants as c
+from system.gui.cards import draw_card_back, draw_card_face
+from system.gui.state import PendingRequest, PlayedCardEntry, TableState
+from system.gui.widgets import Button, TextInput
+from system.text import (
+    prompt_ask_for_hochzeit,
+    prompt_ask_for_ramsch,
+    prompt_ask_player_shoots,
+    prompt_ask_player_shoots_back,
+    prompt_ask_to_choose_game,
+    prompt_ask_to_double_game_value,
+)
+
+if TYPE_CHECKING:
+    from card_classes.Cards import Card, Color
+    from game_classes.Game import Game
+    from player_classes.Player import Player
+    from system.Renderer import GameResult
+
+
+_YES_NO_PROMPTS: dict[YesNoKind, Callable[[str], str]] = {
+    YesNoKind.DOUBLE_GAME_VALUE: prompt_ask_to_double_game_value,
+    YesNoKind.CHOOSE_GAME: prompt_ask_to_choose_game,
+    YesNoKind.HOCHZEIT: prompt_ask_for_hochzeit,
+    YesNoKind.RAMSCH: prompt_ask_for_ramsch,
+    YesNoKind.SHOOT: prompt_ask_player_shoots,
+    YesNoKind.SHOOT_BACK: prompt_ask_player_shoots_back,
+}
+
+
+class GUIRenderer(Renderer):
+    """Renders the table with pygame and collects input from the human player."""
+
+    def __init__(self) -> None:
+        pygame.init()
+        self.screen = pygame.display.set_mode((c.WINDOW_WIDTH, c.WINDOW_HEIGHT))
+        pygame.display.set_caption("Schafkopf")
+        self.clock = pygame.time.Clock()
+        self.fonts = c.Fonts()
+
+        self.lock = threading.RLock()
+        self.state = TableState()
+
+        self._seen_players: list[Player] = []
+        self._seat_index: dict[str, int] = {}
+
+        self._input_event = threading.Event()
+        self._input_result: Any = None
+        self._game_error: str | None = None
+
+        self._current_buttons: list[Button] = []
+        self._current_card_rects: list[pygame.Rect] = []
+        self._text_input = TextInput(rect=pygame.Rect(0, 0, 1, 1))
+
+    # ------------------------------------------------------------------
+    # entry point
+    # ------------------------------------------------------------------
+    def run(self, target: Callable[[], None]) -> None:
+        """Starts the game logic in a background thread and runs the GUI loop."""
+
+        thread = threading.Thread(target=self._run_game, args=(target,), daemon=True)
+        thread.start()
+        self._main_loop()
+
+    def _run_game(self, target: Callable[[], None]) -> None:
+        try:
+            target()
+        except BaseException:
+            traceback.print_exc()
+            with self.lock:
+                self._game_error = "The game crashed - see the console for details."
+            self._input_event.set()
+
+    def _main_loop(self) -> None:
+        running = True
+        while running:
+            mouse_pos = pygame.mouse.get_pos()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    self._handle_click(mouse_pos)
+                elif event.type == pygame.KEYDOWN:
+                    self._handle_key(event)
+            self._draw(mouse_pos)
+            pygame.display.flip()
+            self.clock.tick(c.FPS)
+        pygame.quit()
+        os._exit(0)
+
+    # ------------------------------------------------------------------
+    # seat assignment
+    # ------------------------------------------------------------------
+    def _ensure_seat(self, player: Player) -> int:
+        """Returns the fixed seat index (0=bottom/human, 1=left, 2=top, 3=right).
+
+        The seating is established once, the first time all four players
+        have been seen, with the human always placed at seat 0. It then
+        stays fixed for the rest of the game, regardless of turn order.
+        """
+
+        with self.lock:
+            seat = self._seat_index.get(player.player_name)
+            if seat is not None:
+                return seat
+
+            if not any(p.player_name == player.player_name for p in self._seen_players):
+                self._seen_players.append(player)
+
+            if len(self._seen_players) >= 4:
+                human_idx = next(
+                    i for i, p in enumerate(self._seen_players) if not p.is_bot
+                )
+                ordered = self._seen_players[human_idx:] + self._seen_players[:human_idx]
+                for i, p in enumerate(ordered):
+                    self._seat_index[p.player_name] = i
+                    self.state.seat_names[i] = p.player_name
+                    self.state.seat_players[i] = p
+                return self._seat_index[player.player_name]
+
+            return c.BOTTOM
+
+    # ------------------------------------------------------------------
+    # Renderer interface - render_* (called from the game thread)
+    # ------------------------------------------------------------------
+    def render(self, message: str) -> None:
+        message = message.strip()
+        with self.lock:
+            self.state.message = message
+        if message:
+            time.sleep(0.6)
+
+    def render_hand(self, player: Player, cards: list[Card]) -> None:
+        seat = self._ensure_seat(player)
+        with self.lock:
+            self.state.hand_sizes[seat] = len(cards)
+            if seat == c.BOTTOM:
+                self.state.human_hand = list(cards)
+
+    def render_played_card(self, player: Player, card: Card) -> None:
+        seat = self._ensure_seat(player)
+        if player.is_bot:
+            time.sleep(random.uniform(0.5, 1.0))
+        with self.lock:
+            self.state.center_cards.append(PlayedCardEntry(seat=seat, card=card))
+            self.state.hand_sizes[seat] = max(0, self.state.hand_sizes[seat] - 1)
+            if seat == c.BOTTOM and card in self.state.human_hand:
+                self.state.human_hand.remove(card)
+
+    def render_trick_winner(self, winner: Player) -> None:
+        seat = self._ensure_seat(winner)
+        with self.lock:
+            self.state.trick_winner_seat = seat
+        time.sleep(1.0)
+        with self.lock:
+            self.state.center_cards.clear()
+            self.state.trick_winner_seat = None
+
+    def render_game_result(self, result: GameResult) -> None:
+        with self.lock:
+            self.state.game_result = result
+            self.state.center_cards.clear()
+            self.state.trick_winner_seat = None
+            self.state.message = ""
+
+    # ------------------------------------------------------------------
+    # Renderer interface - ask_* (called from the game thread, blocking)
+    # ------------------------------------------------------------------
+    def ask_player_name(self) -> str:
+        return self._request(kind="player_name", title="Enter your name")
+
+    def ask_play_again(self) -> bool:
+        result: bool = self._request(
+            kind="play_again",
+            options=[("Play again", True), ("Quit", False)],
+        )
+        with self.lock:
+            self.state.game_result = None
+        return result
+
+    def ask_yes_no(self, player: Player, kind: YesNoKind, allow_yes: bool = True) -> bool:
+        prompt = _YES_NO_PROMPTS[kind](player.player_name)
+        options: list[tuple[str, Any]] = []
+        if allow_yes:
+            options.append(("Yes", True))
+        options.append(("No", False))
+        return self._request(
+            kind="yes_no", player_name=player.player_name, title=prompt, options=options
+        )
+
+    def ask_game_mode(
+        self,
+        player: Player,
+        options: dict[str, type[Game]],
+        quitting_possible: bool,
+    ) -> type[Game] | None:
+        btn_options: list[tuple[str, Any]] = [
+            (game_mode.name, game_mode) for game_mode in options.values()
+        ]
+        if quitting_possible:
+            btn_options.append(("Skip", None))
+        title = f"{player.player_name}: Which game do you want to choose?"
+        return self._request(
+            kind="game_mode",
+            player_name=player.player_name,
+            title=title,
+            options=btn_options,
+        )
+
+    def ask_color(
+        self, player: Player, options: dict[str, Color], kind: ColorChoiceKind
+    ) -> Color:
+        btn_options: list[tuple[str, Any]] = [
+            (color.display_name, color) for color in options.values()
+        ]
+        what = "Sau" if kind == ColorChoiceKind.SAU else "trump"
+        title = f"{player.player_name}: Which {what} color do you want to play?"
+        return self._request(
+            kind="color",
+            player_name=player.player_name,
+            title=title,
+            options=btn_options,
+        )
+
+    def ask_card(
+        self,
+        player: Player,
+        player_cards: list[Card],
+        legal_mask: list[bool],
+        is_swap: bool = False,
+    ) -> int:
+        title = "Choose a card to swap" if is_swap else "Choose a card to play"
+        return self._request(
+            kind="card",
+            player_name=player.player_name,
+            title=title,
+            legal_mask=list(legal_mask),
+            is_swap=is_swap,
+        )
+
+    # ------------------------------------------------------------------
+    # blocking request/response plumbing
+    # ------------------------------------------------------------------
+    def _request(self, kind: str, **kwargs: Any) -> Any:
+        request = PendingRequest(kind=kind, **kwargs)
+        self._input_event.clear()
+        if kind == "player_name":
+            self._text_input.text = ""
+        with self.lock:
+            self.state.pending = request
+        self._input_event.wait()
+        return self._input_result
+
+    def _submit(self, value: Any) -> None:
+        with self.lock:
+            self.state.pending = None
+        self._input_result = value
+        self._input_event.set()
+
+    # ------------------------------------------------------------------
+    # input handling (main thread)
+    # ------------------------------------------------------------------
+    def _handle_click(self, pos: tuple[int, int]) -> None:
+        with self.lock:
+            pending = self.state.pending
+
+        if pending is None:
+            return
+
+        if pending.kind == "card":
+            for index, rect in enumerate(self._current_card_rects):
+                if rect.collidepoint(pos) and pending.legal_mask[index]:
+                    self._submit(index)
+                    return
+            return
+
+        if pending.kind == "player_name":
+            for button in self._current_buttons:
+                if button.is_clicked(pos):
+                    name = self._text_input.text.strip().capitalize()
+                    if name:
+                        self._submit(name)
+                    return
+            return
+
+        for button in self._current_buttons:
+            if button.is_clicked(pos):
+                self._submit(button.value)
+                return
+
+    def _handle_key(self, event: pygame.event.Event) -> None:
+        with self.lock:
+            pending = self.state.pending
+
+        if pending is None:
+            return
+
+        if pending.kind == "card":
+            if pygame.K_1 <= event.key <= pygame.K_9:
+                index = event.key - pygame.K_1
+                if (
+                    pending.legal_mask is not None
+                    and index < len(pending.legal_mask)
+                    and pending.legal_mask[index]
+                ):
+                    self._submit(index)
+            return
+
+        if pending.kind == "player_name":
+            if self._text_input.handle_event(event):
+                name = self._text_input.text.strip().capitalize()
+                if name:
+                    self._submit(name)
+
+    # ------------------------------------------------------------------
+    # drawing (main thread)
+    # ------------------------------------------------------------------
+    def _draw(self, mouse_pos: tuple[int, int]) -> None:
+        self._current_buttons = []
+        self._current_card_rects = []
+        with self.lock:
+            self.screen.fill(c.TABLE_GREEN)
+            pygame.draw.rect(
+                self.screen,
+                c.TABLE_GREEN_DARK,
+                pygame.Rect(20, 20, c.WINDOW_WIDTH - 40, c.WINDOW_HEIGHT - 40),
+                width=4,
+                border_radius=30,
+            )
+
+            self._draw_bot_seat(c.LEFT, mouse_pos)
+            self._draw_bot_seat(c.TOP, mouse_pos)
+            self._draw_bot_seat(c.RIGHT, mouse_pos)
+            self._draw_human_seat()
+            self._draw_center()
+
+            if self.state.message:
+                self._draw_message()
+            if self.state.game_result is not None:
+                self._draw_result_panel()
+            if self.state.pending is not None:
+                self._draw_pending(mouse_pos)
+            if self._game_error:
+                self._draw_error()
+
+    def _draw_bot_seat(self, seat: int, mouse_pos: tuple[int, int]) -> None:
+        avatar_pos = c.SEAT_AVATAR_POS[seat]
+        name_pos = c.SEAT_NAME_POS[seat]
+        name = self.state.seat_names[seat]
+
+        if self.state.trick_winner_seat == seat:
+            pygame.draw.circle(self.screen, c.HIGHLIGHT, avatar_pos, c.AVATAR_RADIUS + 6, width=4)
+
+        pygame.draw.circle(self.screen, c.AVATAR_COLORS[seat], avatar_pos, c.AVATAR_RADIUS)
+        pygame.draw.circle(self.screen, c.BLACK, avatar_pos, c.AVATAR_RADIUS, width=2)
+        initial = self._avatar_label(name)
+        font = self.fonts.title if len(initial) == 1 else self.fonts.heading
+        initial_surf = font.render(initial, True, c.WHITE)
+        self.screen.blit(initial_surf, initial_surf.get_rect(center=avatar_pos))
+
+        label = name or "..."
+        player = self.state.seat_players[seat]
+        if player is not None:
+            label = f"{name} ({player.money}¢)"
+        name_surf = self.fonts.name.render(label, True, c.TEXT_LIGHT)
+        self.screen.blit(name_surf, name_surf.get_rect(center=name_pos))
+
+        # hidden hand, shown as fanned card backs
+        amount = self.state.hand_sizes[seat]
+        center_x, center_y = c.SEAT_HAND_CENTER[seat]
+        width, height = c.BACK_CARD_SIZE
+        spacing = 24
+        if c.SEAT_HAND_ORIENTATION[seat] == c.HORIZONTAL:
+            total_width = spacing * (amount - 1) + width if amount else 0
+            start_x = center_x - total_width // 2
+            for i in range(amount):
+                rect = pygame.Rect(start_x + i * spacing, center_y - height // 2, width, height)
+                draw_card_back(self.screen, rect)
+        else:
+            total_height = spacing * (amount - 1) + height if amount else 0
+            start_y = center_y - total_height // 2
+            for i in range(amount):
+                rect = pygame.Rect(center_x - width // 2, start_y + i * spacing, width, height)
+                draw_card_back(self.screen, rect)
+
+    def _draw_human_seat(self) -> None:
+        name = self.state.seat_names[c.BOTTOM] or "You"
+        player = self.state.seat_players[c.BOTTOM]
+        label = name if player is None else f"{name} ({player.money}¢)"
+        name_pos = c.SEAT_NAME_POS[c.BOTTOM]
+        name_surf = self.fonts.name.render(label, True, c.TEXT_LIGHT)
+        if self.state.trick_winner_seat == c.BOTTOM:
+            highlight_rect = name_surf.get_rect(center=name_pos).inflate(24, 12)
+            pygame.draw.rect(self.screen, c.HIGHLIGHT, highlight_rect, border_radius=8)
+        self.screen.blit(name_surf, name_surf.get_rect(center=name_pos))
+
+        cards = self.state.human_hand
+        rects = self._hand_card_rects(len(cards))
+        pending = self.state.pending
+        legal_mask = pending.legal_mask if pending and pending.kind == "card" else None
+        for index, (card, rect) in enumerate(zip(cards, rects)):
+            dim = legal_mask is not None and not legal_mask[index]
+            draw_card_face(self.screen, rect, card, self.fonts, dim=dim)
+        if legal_mask is not None:
+            self._current_card_rects = rects
+
+    def _draw_center(self) -> None:
+        for entry in self.state.center_cards:
+            rect = self._center_card_rect(entry.seat)
+            draw_card_face(self.screen, rect, entry.card, self.fonts)
+
+    def _draw_message(self) -> None:
+        surf = self.fonts.body.render(self.state.message, True, c.TEXT_LIGHT)
+        rect = surf.get_rect(midtop=(c.WINDOW_WIDTH // 2, 8))
+        bg = pygame.Surface(rect.inflate(24, 12).size, pygame.SRCALPHA)
+        bg.fill((0, 0, 0, 140))
+        self.screen.blit(bg, rect.inflate(24, 12).topleft)
+        self.screen.blit(surf, rect)
+
+    def _draw_error(self) -> None:
+        surf = self.fonts.body.render(f"Error: {self._game_error}", True, (255, 90, 90))
+        rect = surf.get_rect(midbottom=(c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT - 8))
+        self.screen.blit(surf, rect)
+
+    # ------------------------------------------------------------------
+    # modal dialogs
+    # ------------------------------------------------------------------
+    def _draw_pending(self, mouse_pos: tuple[int, int]) -> None:
+        pending = self.state.pending
+        assert pending is not None
+
+        if pending.kind == "card":
+            banner = self.fonts.heading.render(pending.title, True, c.TEXT_LIGHT)
+            rect = banner.get_rect(midtop=(c.WINDOW_WIDTH // 2, 8))
+            bg = pygame.Surface(rect.inflate(24, 12).size, pygame.SRCALPHA)
+            bg.fill((0, 0, 0, 140))
+            self.screen.blit(bg, rect.inflate(24, 12).topleft)
+            self.screen.blit(banner, rect)
+            return
+
+        if pending.kind == "play_again":
+            self._draw_play_again_buttons(mouse_pos)
+            return
+
+        overlay = pygame.Surface((c.WINDOW_WIDTH, c.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((*c.OVERLAY_COLOR, c.OVERLAY_ALPHA))
+        self.screen.blit(overlay, (0, 0))
+
+        if pending.kind == "player_name":
+            self._draw_player_name_panel()
+        else:
+            self._draw_choice_panel(pending, mouse_pos)
+
+    def _draw_choice_panel(self, pending: PendingRequest, mouse_pos: tuple[int, int]) -> None:
+        amount = len(pending.options)
+        btn_w, btn_h, gap = 200, 50, 16
+        cols = min(amount, 3) or 1
+        rows = (amount + cols - 1) // cols
+
+        btn_panel_w = cols * (btn_w + gap) + gap
+        text_max_width = max(360, btn_panel_w) - 40
+        title_lines = self._wrap_text(pending.title, self.fonts.heading, text_max_width)
+        text_w = max(self.fonts.heading.size(line)[0] for line in title_lines)
+
+        panel_w = max(360, btn_panel_w, text_w + 40)
+        panel_h = 60 + len(title_lines) * 32 + rows * (btn_h + gap) + gap
+        panel_rect = pygame.Rect(0, 0, panel_w, panel_h)
+        panel_rect.center = (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2)
+        pygame.draw.rect(self.screen, c.PANEL_BG, panel_rect, border_radius=12)
+        pygame.draw.rect(self.screen, c.PANEL_BORDER, panel_rect, width=2, border_radius=12)
+
+        y = panel_rect.top + 30
+        for line in title_lines:
+            surf = self.fonts.heading.render(line, True, c.TEXT_DARK)
+            self.screen.blit(surf, surf.get_rect(midtop=(panel_rect.centerx, y)))
+            y += 32
+
+        y += 8
+        grid_w = cols * (btn_w + gap) - gap
+        start_x = panel_rect.centerx - grid_w // 2
+        for index, (label, value) in enumerate(pending.options):
+            col = index % cols
+            row = index // cols
+            rect = pygame.Rect(start_x + col * (btn_w + gap), y + row * (btn_h + gap), btn_w, btn_h)
+            button = Button(rect=rect, label=label, value=value)
+            button.draw(self.screen, self.fonts, mouse_pos)
+            if pending.kind == "color":
+                swatch = c.SUIT_COLORS.get(value)
+                if swatch is not None:
+                    swatch_rect = pygame.Rect(rect.x + 8, rect.y + 8, 14, rect.height - 16)
+                    pygame.draw.rect(self.screen, swatch, swatch_rect, border_radius=3)
+            self._current_buttons.append(button)
+
+    def _draw_player_name_panel(self) -> None:
+        panel_rect = pygame.Rect(0, 0, 460, 200)
+        panel_rect.center = (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2)
+        pygame.draw.rect(self.screen, c.PANEL_BG, panel_rect, border_radius=12)
+        pygame.draw.rect(self.screen, c.PANEL_BORDER, panel_rect, width=2, border_radius=12)
+
+        title_surf = self.fonts.heading.render("Welcome! Enter your name:", True, c.TEXT_DARK)
+        self.screen.blit(
+            title_surf, title_surf.get_rect(midtop=(panel_rect.centerx, panel_rect.top + 24))
+        )
+
+        self._text_input.rect = pygame.Rect(0, 0, 300, 44)
+        self._text_input.rect.center = (panel_rect.centerx, panel_rect.centery + 5)
+        self._text_input.draw(self.screen, self.fonts)
+
+        ok_rect = pygame.Rect(0, 0, 120, 40)
+        ok_rect.midtop = (panel_rect.centerx, panel_rect.bottom - 56)
+        ok_button = Button(rect=ok_rect, label="OK", enabled=bool(self._text_input.text.strip()))
+        ok_button.draw(self.screen, self.fonts, pygame.mouse.get_pos())
+        self._current_buttons.append(ok_button)
+
+    def _draw_play_again_buttons(self, mouse_pos: tuple[int, int]) -> None:
+        pending = self.state.pending
+        assert pending is not None
+        panel_rect = self._result_panel_rect()
+        btn_w, btn_h, gap = 160, 46, 24
+        total_w = len(pending.options) * btn_w + (len(pending.options) - 1) * gap
+        start_x = panel_rect.centerx - total_w // 2
+        y = panel_rect.bottom - btn_h - 20
+        for index, (label, value) in enumerate(pending.options):
+            rect = pygame.Rect(start_x + index * (btn_w + gap), y, btn_w, btn_h)
+            button = Button(rect=rect, label=label, value=value)
+            button.draw(self.screen, self.fonts, mouse_pos)
+            self._current_buttons.append(button)
+
+    # ------------------------------------------------------------------
+    # game result screen
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _result_panel_rect() -> pygame.Rect:
+        rect = pygame.Rect(0, 0, 640, 560)
+        rect.center = (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2)
+        return rect
+
+    def _draw_result_panel(self) -> None:
+        result = self.state.game_result
+        assert result is not None
+
+        overlay = pygame.Surface((c.WINDOW_WIDTH, c.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((*c.OVERLAY_COLOR, c.OVERLAY_ALPHA))
+        self.screen.blit(overlay, (0, 0))
+
+        panel_rect = self._result_panel_rect()
+        pygame.draw.rect(self.screen, c.PANEL_BG, panel_rect, border_radius=14)
+        pygame.draw.rect(self.screen, c.PANEL_BORDER, panel_rect, width=2, border_radius=14)
+
+        x = panel_rect.left + 30
+        y = panel_rect.top + 20
+
+        title_surf = self.fonts.title.render("Game Result", True, c.TEXT_DARK)
+        self.screen.blit(title_surf, title_surf.get_rect(midtop=(panel_rect.centerx, y)))
+        y += 50
+
+        for team in result.most_point_teams:
+            player_names = ", ".join(player.player_name for player in team.players)
+            line = f"{team.team_name}: {team.points} points ({player_names})"
+            self.screen.blit(self.fonts.body.render(line, True, c.TEXT_DARK), (x, y))
+            y += 26
+
+        y += 6
+        if len(result.winners) == 1:
+            winners_line = f"Winner: {result.winners[0].player_name}"
+        else:
+            winners_line = "Winners: " + ", ".join(p.player_name for p in result.winners)
+        self.screen.blit(self.fonts.heading.render(winners_line, True, c.TEXT_DARK), (x, y))
+        y += 36
+
+        for line in result.game_value_breakdown.split("\n"):
+            line = line.strip()
+            if line:
+                self.screen.blit(self.fonts.body.render(line, True, c.TEXT_DARK), (x, y))
+                y += 24
+
+        y += 6
+        value_surf = self.fonts.heading.render(
+            f"Game value: {result.game_value} cents", True, c.TEXT_DARK
+        )
+        self.screen.blit(value_surf, (x, y))
+        y += 44
+
+        pygame.draw.rect(self.screen, c.PANEL_BORDER, pygame.Rect(x, y, panel_rect.width - 60, 2))
+        y += 16
+
+        for player in result.players:
+            line = f"{player.player_name}: {player.money} cents"
+            self.screen.blit(self.fonts.body.render(line, True, c.TEXT_DARK), (x, y))
+            y += 26
+
+    # ------------------------------------------------------------------
+    # layout helpers
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _hand_card_rects(amount: int) -> list[pygame.Rect]:
+        if amount == 0:
+            return []
+        width, height = c.HAND_CARD_SIZE
+        spacing = min(width + 10, (c.WINDOW_WIDTH - 80) // amount)
+        total_width = spacing * (amount - 1) + width
+        start_x = (c.WINDOW_WIDTH - total_width) // 2
+        y = c.WINDOW_HEIGHT - height - 20
+        return [pygame.Rect(start_x + i * spacing, y, width, height) for i in range(amount)]
+
+    @staticmethod
+    def _center_card_rect(seat: int) -> pygame.Rect:
+        width, height = c.CENTER_CARD_SIZE
+        cx, cy = c.CENTER
+        dx, dy = c.CENTER_CARD_OFFSETS[seat]
+        return pygame.Rect(cx + dx - width // 2, cy + dy - height // 2, width, height)
+
+    @staticmethod
+    def _avatar_label(name: str) -> str:
+        """A short label for a bot's avatar circle (e.g. "Bot 1" -> "B1")."""
+
+        parts = name.split()
+        if len(parts) >= 2:
+            return (parts[0][0] + parts[-1][0]).upper()
+        return name[:2].upper() if name else "?"
+
+    @staticmethod
+    def _wrap_text(text: str, font: pygame.font.Font, max_width: int) -> list[str]:
+        words = text.split(" ")
+        lines: list[str] = []
+        current = ""
+        for word in words:
+            candidate = f"{current} {word}".strip()
+            if font.size(candidate)[0] <= max_width:
+                current = candidate
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        return lines or [""]

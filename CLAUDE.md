@@ -6,9 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 All commands must be run from the project root, as imports use package-relative paths.
 
-**Run the game:**
+**Run the game (pygame GUI):**
 ```bash
-python3 system/run.py
+python3 -m system.run
+```
+
+**Run the game in the terminal (no GUI):**
+```bash
+python3 -m system.run --console
 ```
 
 **Run all tests:**
@@ -59,7 +64,19 @@ Rather than putting game-specific logic in `Game`, each concrete game composes t
 
 ### Rendering abstraction
 
-`system/Renderer.py` defines the `Renderer` ABC (`render`, `ask_decision`, `ask_with_validation`). `ConsoleRenderer` is the only implementation. All game and player classes receive a `Renderer` instance — no direct `print`/`input` calls outside `ConsoleRenderer`. All display strings are pure functions in `system/text.py`; `game_classes/GameRenderer.py` wraps `Renderer` with game-specific render calls.
+`system/Renderer.py` defines the `Renderer` ABC with semantic render methods (`render`, `render_hand`, `render_played_card`, `render_trick_winner`, `render_game_result`) and ask methods (`ask_player_name`, `ask_play_again`, `ask_yes_no`, `ask_game_mode`, `ask_color`, `ask_card`). All game and player classes receive a `Renderer` instance — no direct `print`/`input` calls outside the renderer implementations. All display strings are pure functions in `system/text.py`; `game_classes/GameRenderer.py` wraps `Renderer` with game-specific render calls.
+
+Two implementations exist:
+
+- `ConsoleRenderer` (in `system/Renderer.py`) — prints to stdout and reads from stdin. Used via `python3 -m system.run --console`.
+- `GUIRenderer` (in `system/gui/`) — a pygame table view. Default for `python3 -m system.run`.
+
+#### GUI architecture (`system/gui/`)
+
+- `renderer.py` — `GUIRenderer`. Game logic (`Schafkopf.main()`) runs on a daemon background thread started by `GUIRenderer.run()`; the pygame event/draw loop runs on the main thread (required on macOS). All shared state lives in a `TableState` (`state.py`) guarded by `self.lock` (`threading.RLock`).
+- Blocking `ask_*` calls use a request/response pattern: the game thread sets `state.pending` to a `PendingRequest` and blocks on a `threading.Event`; the main loop renders the corresponding modal and calls `_submit(value)` on click/keypress, which sets the result and the event.
+- Seats are fixed for the whole game the first time four distinct players are seen (`_ensure_seat`): seat 0 is always the human (bottom), 1/2/3 are the bots (left/top/right) in a consistent order.
+- `constants.py` holds layout/color/font constants, `cards.py` draws card faces/backs, `widgets.py` has `Button`/`TextInput`.
 
 ### Circular-import pattern
 
