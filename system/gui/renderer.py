@@ -213,6 +213,10 @@ class GUIRenderer(Renderer):
             self.state.center_cards.clear()
             self.state.trick_winner_seat = None
             self.state.message = ""
+            # The hand is over - the "show last round" button must not offer
+            # this hand's last trick while the player is asked to play again.
+            self.state.previous_round_cards = []
+            self.state.show_previous_round = False
 
     def render_want_to_play_decision(self, player: Player, wants_to_play: bool) -> None:
         self._announce_choice(

@@ -7,6 +7,7 @@ import pytest
 from system.gui import constants as c
 from system.gui.renderer import GUIRenderer
 from system.gui.state import PlayedCardEntry
+from system.Renderer import GameResult
 
 
 @pytest.fixture
@@ -44,6 +45,24 @@ def test_render_trick_winner_overwrites_older_round(
     renderer.render_trick_winner(winner=players[0])
 
     assert renderer.state.previous_round_cards == new_entries
+
+
+def test_render_game_result_resets_previous_round(renderer, players, eichel_sau):
+    renderer.state.previous_round_cards = [PlayedCardEntry(seat=0, card=eichel_sau)]
+    renderer.state.show_previous_round = True
+
+    renderer.render_game_result(
+        result=GameResult(
+            most_point_teams=[],
+            winners=[],
+            game_value=0,
+            game_value_breakdown="",
+            players=players,
+        )
+    )
+
+    assert renderer.state.previous_round_cards == []
+    assert renderer.state.show_previous_round is False
 
 
 def test_render_game_mode_none_resets_previous_round(renderer, eichel_sau):
