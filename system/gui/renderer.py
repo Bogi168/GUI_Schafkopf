@@ -53,6 +53,7 @@ _YES_NO_PROMPTS: dict[YesNoKind, Callable[[str], str]] = {
 }
 
 _CHOICE_ANNOUNCEMENT_DELAY = 1.6
+_FAREWELL_DELAY = 5.0
 
 
 class GUIRenderer(Renderer):
@@ -78,6 +79,7 @@ class GUIRenderer(Renderer):
         self._current_card_rects: list[pygame.Rect] = []
         self._previous_round_button: Button | None = None
         self._text_input = TextInput(rect=pygame.Rect(0, 0, 1, 1))
+        self._should_quit = False
 
     # ------------------------------------------------------------------
     # entry point
@@ -112,6 +114,9 @@ class GUIRenderer(Renderer):
             self._draw(mouse_pos)
             pygame.display.flip()
             self.clock.tick(c.FPS)
+            with self.lock:
+                if self._should_quit:
+                    running = False
         pygame.quit()
         os._exit(0)
 
@@ -146,6 +151,15 @@ class GUIRenderer(Renderer):
             self.state.message = message
         if message:
             time.sleep(0.6)
+
+    def render_farewell(self, message: str) -> None:
+        with self.lock:
+            self.state.choice_announcement = message.strip()
+            self.state.choice_announcement_detail = None
+            self.state.choice_announcement_detail_color = None
+        time.sleep(_FAREWELL_DELAY)
+        with self.lock:
+            self._should_quit = True
 
     def render_hand(self, player: Player, cards: list[Card]) -> None:
         seat = self._ensure_seat(player)

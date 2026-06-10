@@ -244,4 +244,4 @@ class Schafkopf:
             if not self.renderer.ask_play_again():
                 break
 
-        self.renderer.render(message=words_of_thanks)
+        self.renderer.render_farewell(message=words_of_thanks)

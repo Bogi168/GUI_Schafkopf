@@ -43,3 +43,12 @@ def test_console_renderer_announces_game_mode_without_chooser(capsys):
 
     captured = capsys.readouterr()
     assert captured.out.strip() == "Ramsch is being played."
+
+
+def test_console_renderer_render_farewell(capsys):
+    renderer = ConsoleRenderer()
+
+    renderer.render_farewell("\nThank you for playing!")
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "Thank you for playing!"

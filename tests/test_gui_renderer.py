@@ -87,3 +87,27 @@ def test_draw_previous_round_does_not_crash(renderer, eichel_sau, gruen_sau):
     renderer.state.show_previous_round = True
 
     renderer._draw((0, 0))
+
+
+def test_render_farewell_shows_centered_announcement_and_requests_quit(renderer):
+    renderer.render_farewell("\nThank you for playing!")
+
+    assert renderer.state.choice_announcement == "Thank you for playing!"
+    assert renderer._should_quit is True
+
+    renderer._draw((0, 0))
+
+
+def test_main_loop_exits_after_farewell(renderer, monkeypatch):
+    monkeypatch.setattr("system.gui.renderer.pygame.event.get", lambda: [])
+    monkeypatch.setattr("system.gui.renderer.pygame.display.flip", lambda: None)
+    monkeypatch.setattr("system.gui.renderer.pygame.quit", lambda: None)
+    renderer.clock = type("DummyClock", (), {"tick": lambda *_args: None})()
+    monkeypatch.setattr(
+        "system.gui.renderer.os._exit",
+        lambda code: (_ for _ in ()).throw(SystemExit(code)),
+    )
+    renderer._should_quit = True
+
+    with pytest.raises(SystemExit):
+        renderer._main_loop()
