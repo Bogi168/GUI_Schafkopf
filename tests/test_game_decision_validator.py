@@ -74,6 +74,29 @@ def test_count_color_cards_empty_hand(validator):
     )
 
 
+def test_hochzeit_playable_with_exactly_one_trump(
+    validator, herz_sau, eichel_ten, gruen_koenig
+):
+    # exactly one trump card (Herz Sau) -> Hochzeit playable
+    player_cards = [herz_sau, eichel_ten, gruen_koenig]
+    assert validator.is_hochzeit_playable(player_cards=player_cards)
+
+
+def test_hochzeit_not_playable_with_no_trumps(
+    validator, eichel_ten, gruen_koenig, schellen_sau
+):
+    player_cards = [eichel_ten, gruen_koenig, schellen_sau]
+    assert not validator.is_hochzeit_playable(player_cards=player_cards)
+
+
+def test_hochzeit_not_playable_with_multiple_trumps(
+    validator, herz_sau, eichel_ober, eichel_ten
+):
+    # Herz Sau and Eichel Ober are both trump -> two trumps, not playable
+    player_cards = [herz_sau, eichel_ober, eichel_ten]
+    assert not validator.is_hochzeit_playable(player_cards=player_cards)
+
+
 def test_sauspiel_playable_has_callable_color(
     validator, eichel_ten, gruen_koenig, herz_ober
 ):

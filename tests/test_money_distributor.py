@@ -1,7 +1,10 @@
 from __future__ import annotations
 import pytest
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 from money_handling.MoneyDistributer import MoneyDistributer
+from player_classes.Player import Player
+from system.custom_exceptions import MoneyDistributionNotPossibleError
 
 if TYPE_CHECKING:
     from player_classes.Player import Player
@@ -77,3 +80,44 @@ def test_distribute_money_three_winners(
     assert player_2.money == game_value
     assert player_3.money == game_value
     assert player_4.money == game_value
+
+
+def test_distribute_money_no_winners_is_a_no_op(
+    team_alone_player_1, team_three_players_2_3_4, distributer
+):
+    players: list[Player] = [team_alone_player_1.players[0]] + list(
+        team_three_players_2_3_4.players
+    )
+
+    distributer.distribute_money(game_value=10, winners=[], players=players)
+
+    for player in players:
+        assert player.money == 0
+
+
+def test_distribute_money_everyone_wins_is_a_no_op(
+    team_alone_player_1, team_three_players_2_3_4, distributer
+):
+    players: list[Player] = [team_alone_player_1.players[0]] + list(
+        team_three_players_2_3_4.players
+    )
+
+    distributer.distribute_money(game_value=10, winners=players, players=players)
+
+    for player in players:
+        assert player.money == 0
+
+
+def test_distribute_money_uneven_split_raises(distributer):
+    players: list[Player] = [
+        Player(
+            player_name=f"Testplayer {i}",
+            renderer=MagicMock(),
+            game_decision_validator=MagicMock(),
+        )
+        for i in range(1, 6)
+    ]
+    winners: list[Player] = players[:2]
+
+    with pytest.raises(MoneyDistributionNotPossibleError):
+        distributer.distribute_money(game_value=10, winners=winners, players=players)
