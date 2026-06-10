@@ -207,12 +207,31 @@ class GUIRenderer(Renderer):
             )
         )
 
-    def _announce_choice(self, message: str) -> None:
+    def render_game_mode_announcement(
+        self,
+        game_mode_name: str,
+        chooser: Player | None,
+        detail: str | None = None,
+        detail_color: Color | None = None,
+    ) -> None:
+        if chooser is not None:
+            message = f"{chooser.player_name} chooses {game_mode_name}"
+        else:
+            message = f"{game_mode_name} is being played"
+        self._announce_choice(message, detail=detail, detail_color=detail_color)
+
+    def _announce_choice(
+        self, message: str, detail: str | None = None, detail_color: Color | None = None
+    ) -> None:
         with self.lock:
             self.state.choice_announcement = message
+            self.state.choice_announcement_detail = detail
+            self.state.choice_announcement_detail_color = detail_color
         time.sleep(_CHOICE_ANNOUNCEMENT_DELAY)
         with self.lock:
             self.state.choice_announcement = None
+            self.state.choice_announcement_detail = None
+            self.state.choice_announcement_detail_color = None
 
     # ------------------------------------------------------------------
     # Renderer interface - ask_* (called from the game thread, blocking)
@@ -509,13 +528,37 @@ class GUIRenderer(Renderer):
     def _draw_choice_announcement(self) -> None:
         text = self.state.choice_announcement
         assert text is not None
-        surf = self.fonts.announcement.render(text, True, c.TEXT_LIGHT)
-        rect = surf.get_rect(center=(c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2))
+        detail = self.state.choice_announcement_detail
+        detail_color = self.state.choice_announcement_detail_color
+        font = self.fonts.announcement
+
+        pieces: list[pygame.Surface] = [font.render(text, True, c.TEXT_LIGHT)]
+        if detail is not None:
+            suffix = None
+            if detail_color is not None and detail.startswith(detail_color.display_name):
+                suffix = detail[len(detail_color.display_name):].strip()
+
+            if suffix is not None:
+                assert detail_color is not None
+                pieces.append(font.render(" (", True, c.TEXT_LIGHT))
+                pieces.append(get_suit_image(detail_color, height=font.get_height()))
+                pieces.append(font.render(f" {suffix})", True, c.TEXT_LIGHT))
+            else:
+                pieces.append(font.render(f" ({detail})", True, c.TEXT_LIGHT))
+
+        total_width = sum(piece.get_width() for piece in pieces)
+        height = max(piece.get_height() for piece in pieces)
+        rect = pygame.Rect(0, 0, total_width, height)
+        rect.center = (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2)
         bg_rect = rect.inflate(60, 36)
         bg = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
         bg.fill((0, 0, 0, 170))
         self.screen.blit(bg, bg_rect.topleft)
-        self.screen.blit(surf, rect)
+
+        x = rect.x
+        for piece in pieces:
+            self.screen.blit(piece, (x, rect.centery - piece.get_height() // 2))
+            x += piece.get_width()
 
     def _draw_message(self) -> None:
         surf = self.fonts.body.render(self.state.message, True, c.TEXT_LIGHT)

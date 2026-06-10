@@ -24,6 +24,7 @@ from system.text import (
     tell_chosen_game_mode,
     tell_player_wants_to_play,
     tell_player_chose_game_mode,
+    tell_game_mode_announcement,
     tell_most_point_teams,
     tell_team_points,
     tell_team_players,
@@ -111,6 +112,16 @@ class Renderer(ABC):
 
     @abstractmethod
     def render_game_mode_decision(self, player: Player, game_mode: type[Game] | None) -> None:
+        pass
+
+    @abstractmethod
+    def render_game_mode_announcement(
+        self,
+        game_mode_name: str,
+        chooser: Player | None,
+        detail: str | None = None,
+        detail_color: Color | None = None,
+    ) -> None:
         pass
 
     @abstractmethod
@@ -224,6 +235,21 @@ class ConsoleRenderer(Renderer):
         print(
             tell_player_chose_game_mode(
                 player_name=player.player_name, game_mode=game_mode
+            )
+        )
+
+    def render_game_mode_announcement(
+        self,
+        game_mode_name: str,
+        chooser: Player | None,
+        detail: str | None = None,
+        detail_color: Color | None = None,
+    ) -> None:
+        print(
+            tell_game_mode_announcement(
+                game_mode_name=game_mode_name,
+                chooser_name=chooser.player_name if chooser is not None else None,
+                detail=detail,
             )
         )
 

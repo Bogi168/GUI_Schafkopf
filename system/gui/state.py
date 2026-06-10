@@ -51,6 +51,8 @@ class TableState:
     current_game_mode_detail: str | None = None
     current_game_mode_detail_color: Color | None = None
     choice_announcement: str | None = None
+    choice_announcement_detail: str | None = None
+    choice_announcement_detail_color: Color | None = None
     message: str = ""
     game_result: GameResult | None = None
     pending: PendingRequest | None = None

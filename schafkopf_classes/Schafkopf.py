@@ -228,6 +228,12 @@ class Schafkopf:
                     detail=game.display_detail(),
                     detail_color=game.display_detail_color(),
                 )
+                self.renderer.render_game_mode_announcement(
+                    game_mode_name=game.name,
+                    chooser=getattr(game, "game_chooser", None),
+                    detail=game.display_detail(),
+                    detail_color=game.display_detail_color(),
+                )
                 game.play_game()
             else:
                 self.renderer.render(message=no_game_phrase)

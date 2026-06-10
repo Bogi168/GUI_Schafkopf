@@ -91,6 +91,18 @@ def tell_player_chose_game_mode(player_name: str, game_mode: type[Game] | None) 
         return f"{player_name} chooses {game_mode.name}."
 
 
+def tell_game_mode_announcement(
+    game_mode_name: str, chooser_name: str | None, detail: str | None = None
+) -> str:
+    if chooser_name is None:
+        message = f"{game_mode_name} is being played"
+    else:
+        message = f"{chooser_name} chooses {game_mode_name}"
+    if detail is not None:
+        message += f" ({detail})"
+    return f"{message}."
+
+
 no_game_phrase = "\nNo game was selected."
 
 words_of_thanks = "\nThank you for playing!"
