@@ -18,11 +18,9 @@ _UNTER_STRENGTH = 2.0
 _TRUMP_HERZ_STRENGTH = 1.0
 _SAU_STRENGTH = 1.5
 
-# Minimum hand strength to volunteer for the choosing process. Lower once
-# someone earlier already volunteered, since this bot can then no longer be
-# forced into being the first chooser (who must offer a game and may not pass).
-_WANT_TO_PLAY_THRESHOLD_UNCONTESTED = 8.0
-_WANT_TO_PLAY_THRESHOLD_CONTESTED = 5.0
+# Minimum hand strength to volunteer with a hand that is at best
+# Sauspiel/Hochzeit material (see wants_to_play).
+_WANT_TO_PLAY_THRESHOLD = 8.0
 
 # Hand strength needed to choose/overbid into a Wenz/Solo or a Tout.
 _SOLO_THRESHOLD = 11.0
@@ -39,6 +37,10 @@ _WENZ_RANK = 4
 _SOLO_RANK = 5
 _WENZ_TOUT_RANK = 6
 _SOLO_TOUT_RANK = 7
+
+
+def _unter_count(player_cards: list[Card]) -> int:
+    return sum(1 for card in player_cards if card.card_type == Type.UNTER)
 
 
 def hand_strength(player_cards: list[Card]) -> float:
@@ -59,14 +61,25 @@ def hand_strength(player_cards: list[Card]) -> float:
 
 
 def wants_to_play(player_cards: list[Card], players_who_want_to_play_count: int) -> bool:
-    """Decides whether a bot wants to enter the game-choosing process."""
+    """Decides whether a bot wants to enter the game-choosing process.
 
-    threshold = (
-        _WANT_TO_PLAY_THRESHOLD_CONTESTED
-        if players_who_want_to_play_count > 0
-        else _WANT_TO_PLAY_THRESHOLD_UNCONTESTED
-    )
-    return hand_strength(player_cards) >= threshold
+    A hand strong enough for Wenz/Solo (or better) is always worth offering:
+    such a mode either still outranks whatever the earlier choosers landed
+    on, or this bot can simply pass once it's its turn (see
+    choose_preferred_game_mode). A hand that is at best Sauspiel/Hochzeit
+    material is only worth offering if this bot is the first chooser - any
+    later chooser whose preferred mode is still Sauspiel would be forced to
+    overbid into an unsuited Wenz/Solo instead.
+    """
+
+    strength = hand_strength(player_cards)
+    if strength >= _SOLO_THRESHOLD or _unter_count(player_cards) >= _WENZ_MIN_UNTER:
+        return True
+
+    if players_who_want_to_play_count > 0:
+        return False
+
+    return strength >= _WANT_TO_PLAY_THRESHOLD
 
 
 def choose_preferred_game_mode(
@@ -90,8 +103,7 @@ def choose_preferred_game_mode(
         return None
 
     strength = hand_strength(player_cards)
-    unter_count = sum(1 for card in player_cards if card.card_type == Type.UNTER)
-    wenz_favored = unter_count >= _WENZ_MIN_UNTER
+    wenz_favored = _unter_count(player_cards) >= _WENZ_MIN_UNTER
 
     if wenz_favored:
         family_rank, family_tout_rank = _WENZ_RANK, _WENZ_TOUT_RANK
