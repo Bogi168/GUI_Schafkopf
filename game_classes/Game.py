@@ -31,6 +31,7 @@ class Game(ABC):
     name = "Game"
     rank = 0
     is_choosable = False
+    is_tout = False
 
     def __init__(
         self,
@@ -119,6 +120,7 @@ class Game(ABC):
             card_decision_validator=self.card_decision_validator,
             active_team=self.active_team,
             renderer=self.renderer,
+            is_tout=self.is_tout,
         )
 
     def create_winners_selector(self) -> WinnersSelector:

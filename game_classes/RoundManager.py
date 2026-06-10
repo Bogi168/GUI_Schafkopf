@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from player_classes.Team import Team
+from player_classes.card_play_strategy import CardPlayContext
+from player_classes.team_knowledge import infer_team_knowledge
 
 if TYPE_CHECKING:
     from player_classes.Player import Player
@@ -12,6 +14,8 @@ if TYPE_CHECKING:
 
 
 class RoundManager:
+    is_ramsch: bool = False
+
     def __init__(
         self,
         players: list[Player],
@@ -21,6 +25,7 @@ class RoundManager:
         card_decision_validator: CardDecisionValidator,
         active_team: Team | None,
         renderer: Renderer,
+        is_tout: bool = False,
     ) -> None:
         self.players: list[Player] = players
         self.player_teams: dict[Player, Team] = player_teams
@@ -29,7 +34,11 @@ class RoundManager:
         self.card_power_calculator: CardPowerCalculator = card_power_calculator
         self.card_decision_validator: CardDecisionValidator = card_decision_validator
         self.renderer: Renderer = renderer
+        self.is_tout: bool = is_tout
+        self.game_chooser: Player | None = None
+        self.call_sau: Card | None = None
         self.played_cards: list[Card] = []
+        self.trick_history: list[list[tuple[Player, Card]]] = []
         self.amt_game_val_doubles: int = 0
 
     @property
@@ -43,6 +52,15 @@ class RoundManager:
             return self.played_cards[0]
         else:
             return None
+
+    @property
+    def current_trick(self) -> list[tuple[Player, Card]]:
+        """
+        :return: The (player, card) pairs played so far in the current round
+        :rtype: list[tuple[Player, Card]]
+        """
+
+        return list(zip(self.players, self.played_cards))
 
     def handle_shooting(self, players_team: Team, player: Player) -> bool:
         if self.active_team is None or players_team == self.active_team:
@@ -61,7 +79,33 @@ class RoundManager:
             shooting_possible: bool = True
             return shooting_possible
 
+    def _build_context(self, player: Player) -> CardPlayContext:
+        played_cards_history: list[Card] = [
+            card for trick in self.trick_history for _, card in trick
+        ]
+        team_knowledge = infer_team_knowledge(
+            player=player,
+            players=self.players,
+            player_teams=self.player_teams,
+            game_chooser=self.game_chooser,
+            call_sau=self.call_sau,
+            trick_history=self.trick_history,
+        )
+        return CardPlayContext(
+            current_trick=self.current_trick,
+            trumps=self.trumps,
+            card_power_calculator=self.card_power_calculator,
+            played_cards_history=played_cards_history,
+            team_knowledge=team_knowledge,
+            is_ramsch=self.is_ramsch,
+            is_tout=self.is_tout,
+            tricks_remaining=len(player.player_cards),
+        )
+
     def play_card(self, player: Player) -> None:
+        context: CardPlayContext | None = (
+            self._build_context(player) if player.is_bot else None
+        )
         card_decision: Card = player.get_card_play_decision(
             move_validator=lambda d, p=player: self.card_decision_validator.is_move_legal(
                 player_cards=p.player_cards,
@@ -69,6 +113,7 @@ class RoundManager:
                 trumps=self.trumps,
                 lead_card=self.lead_card,
             ),
+            context=context,
         )
         self.played_cards.append(card_decision)
         self.renderer.render_played_card(player=player, card=card_decision)
@@ -99,6 +144,7 @@ class RoundManager:
         self.players = self.players[starter_index:] + self.players[:starter_index]
 
     def prepare_next_round(self, round_winner: Player) -> None:
+        self.trick_history.append(self.current_trick)
         self.sort_players(starter=round_winner)
         self.played_cards.clear()
 
@@ -123,6 +169,7 @@ class RoundManager:
 
 
 class RamschRoundManager(RoundManager):
+    is_ramsch: bool = True
 
     def __init__(
         self,

@@ -19,6 +19,7 @@ class WenzTout(Wenz):
     name = "Wenz Tout"
     rank = 6
     is_choosable = True
+    is_tout = True
 
     game_chooser: Player
     base_price: int

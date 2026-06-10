@@ -19,6 +19,7 @@ class SoloTout(Solo):
     name = "Solo Tout"
     rank = 7
     is_choosable = True
+    is_tout = True
 
     game_chooser: Player
     base_price: int

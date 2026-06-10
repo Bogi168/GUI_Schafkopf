@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from player_classes.Player import Player
     from system.Renderer import Renderer
     from card_classes.Cards import Cards
+    from game_classes.RoundManager import RoundManager
     from money_handling.GameValueCalculator import GameValueCalculator
     from schafkopf_classes.Schafkopf import Schafkopf
 
@@ -112,6 +113,12 @@ class Sauspiel(Game):
             sau_color=chooser.get_sau_color(),
         )
         return kwargs
+
+    def create_round_manager(self) -> RoundManager:
+        round_manager = super().create_round_manager()
+        round_manager.game_chooser = self.game_chooser
+        round_manager.call_sau = self.call_sau
+        return round_manager
 
     def display_detail(self) -> str | None:
         return f"{self.call_sau.card_color.display_name} Sau"

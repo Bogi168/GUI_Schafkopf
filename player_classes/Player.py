@@ -8,6 +8,7 @@ from player_classes.bot_strategy import (
     choose_preferred_game_mode,
     wants_to_play,
 )
+from player_classes.card_play_strategy import choose_card_to_play
 import random
 
 if TYPE_CHECKING:
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from system.Renderer import Renderer
     from card_classes.Cards import Card
     from input_validators.GameDecisionValidator import GameDecisionValidator
+    from player_classes.card_play_strategy import CardPlayContext
 
 
 class Player:
@@ -202,11 +204,15 @@ class Player:
     def get_card_play_decision(
         self,
         move_validator: Callable[[Card], bool],
+        context: CardPlayContext | None = None,
     ) -> Card:
         """
         Asks the player to make a card decision
         :param move_validator: A function that checks whether the decision by the player is legal
         :type move_validator: Callable[[Card], bool]
+        :param context: Information about the game state, used by Bots to make
+            informed decisions. Ignored by human players.
+        :type context: CardPlayContext | None
         :return: A valid card decision made by the player
         :rtype: Card
         """
@@ -287,9 +293,15 @@ class Bot(Player):
     def get_card_play_decision(
         self,
         move_validator: Callable[[Card], bool],
+        context: CardPlayContext | None = None,
     ) -> Card:
         legal_cards = [card for card in self.player_cards if move_validator(card)]
-        decision = random.choice(legal_cards)
+        if context is None:
+            decision = random.choice(legal_cards)
+        else:
+            decision = choose_card_to_play(
+                player=self, legal_cards=legal_cards, context=context
+            )
         self.player_cards.remove(decision)
         return decision
 

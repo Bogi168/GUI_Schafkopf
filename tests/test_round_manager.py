@@ -10,6 +10,7 @@ from input_validators.CardDecisionValidator import (
     RegularTrumpTypeCardDecisionValidator,
     RamschCardDecisionValidator,
 )
+from player_classes.team_knowledge import TeamKnowledge
 
 
 # lead_card
@@ -171,6 +172,36 @@ def test_play_card_appends_decision_and_renders_it(player_1, eichel_sau, eichel_
 
     assert round_manager.played_cards == [eichel_ten]
     renderer.render_played_card.assert_called_once_with(player=player_1, card=eichel_ten)
+    # human players don't get a CardPlayContext - they use the renderer
+    assert player_1.get_card_play_decision.call_args.kwargs["context"] is None
+
+
+def test_play_card_passes_context_for_bot_players(
+    player_1, team_alone_player_1, eichel_sau, eichel_ten, sauspiel_trumps
+):
+    bot = MagicMock()
+    bot.is_bot = True
+    bot.player_cards = [eichel_ten, eichel_sau]
+    bot.get_card_play_decision = MagicMock(return_value=eichel_ten)
+    renderer = MagicMock()
+
+    round_manager = RoundManager(
+        players=[bot],
+        player_teams={bot: team_alone_player_1},
+        trumps=sauspiel_trumps,
+        card_power_calculator=SauspielCardPowerCalculator(),
+        card_decision_validator=RegularTrumpTypeCardDecisionValidator(),
+        active_team=None,
+        renderer=renderer,
+    )
+
+    round_manager.play_card(player=bot)
+
+    context = bot.get_card_play_decision.call_args.kwargs["context"]
+    assert context is not None
+    assert context.trumps == sauspiel_trumps
+    assert context.tricks_remaining == len(bot.player_cards)
+    assert context.team_knowledge == TeamKnowledge(teammates=[], opponents=[], unknown=[])
 
 
 # get_round_winner / reward_round_winner
@@ -251,6 +282,47 @@ def test_prepare_next_round_sorts_players_and_clears_played_cards(
 
     assert round_manager.players[0] == player_2
     assert round_manager.played_cards == []
+
+
+# current_trick / trick_history
+
+
+def test_current_trick_pairs_players_with_played_cards(players, eichel_sau, eichel_ten):
+    round_manager = RoundManager(
+        players=players,
+        player_teams={},
+        trumps=[],
+        card_power_calculator=SauspielCardPowerCalculator(),
+        card_decision_validator=RegularTrumpTypeCardDecisionValidator(),
+        active_team=None,
+        renderer=MagicMock(),
+    )
+    round_manager.played_cards = [eichel_sau, eichel_ten]
+
+    assert round_manager.current_trick == [
+        (players[0], eichel_sau),
+        (players[1], eichel_ten),
+    ]
+
+
+def test_prepare_next_round_appends_current_trick_to_history(
+    players, player_2, eichel_sau, eichel_ten
+):
+    round_manager = RoundManager(
+        players=players.copy(),
+        player_teams={},
+        trumps=[],
+        card_power_calculator=SauspielCardPowerCalculator(),
+        card_decision_validator=RegularTrumpTypeCardDecisionValidator(),
+        active_team=None,
+        renderer=MagicMock(),
+    )
+    round_manager.played_cards = [eichel_sau, eichel_ten]
+    expected_trick = round_manager.current_trick
+
+    round_manager.prepare_next_round(round_winner=player_2)
+
+    assert round_manager.trick_history == [expected_trick]
 
 
 # play_round - shooting is only possible in the first round, and only once
