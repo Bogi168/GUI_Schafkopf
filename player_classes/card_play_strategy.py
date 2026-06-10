@@ -39,6 +39,7 @@ class CardPlayContext:
     is_active_team: bool
     call_sau: Card | None
     tricks_remaining: int
+    trick_history: list[list[tuple[Player, Card]]]
 
 
 def _remaining_unseen_cards(
@@ -120,6 +121,39 @@ def _avoid_call_sau_leads(
     if is_active_team:
         return [card for card in cards if card.card_color != call_sau.card_color]
     return cards
+
+
+def _call_sau_safe_to_reveal(player: Player, context: CardPlayContext) -> bool:
+    """Whether the team that owns the call sau no longer needs to avoid
+    leading/seeking it.
+
+    Avoiding the call sau is mainly an early-game precaution against a
+    Sau-Zwang trump-stab. It stops mattering once either:
+
+    - the player has no trumps left themselves (so they can't be forced
+      into a Sau-Zwang on a later trick anyway), or
+    - the known opponents have already proven (by following a trump lead
+      with non-trump cards - Trumpfzwang) that they're void of trumps and
+      so can't trump the Sau away.
+    """
+
+    trumps = context.trumps
+    if not any(card in trumps for card in player.player_cards):
+        return True
+
+    opponents = context.team_knowledge.opponents
+    if not opponents:
+        return False
+
+    void_of_trumps: set[Player] = set()
+    for trick in context.trick_history:
+        if not trick or trick[0][1] not in trumps:
+            continue
+        for trick_player, card in trick[1:]:
+            if card not in trumps:
+                void_of_trumps.add(trick_player)
+
+    return all(opponent in void_of_trumps for opponent in opponents)
 
 
 def choose_card_to_play(
@@ -220,7 +254,7 @@ def _choose_lead_card(
         return max(trump_legal, key=cpc.get_card_power)
 
     non_trump_legal = [card for card in legal_cards if card not in trumps]
-    if call_sau_in_play:
+    if call_sau_in_play and not _call_sau_safe_to_reveal(player, context):
         filtered = _avoid_call_sau_leads(
             non_trump_legal, call_sau, player, context.is_active_team
         )

@@ -102,6 +102,7 @@ class RoundManager:
             is_active_team=self.player_teams[player] is self.active_team,
             call_sau=self.call_sau,
             tricks_remaining=len(player.player_cards),
+            trick_history=list(self.trick_history),
         )
 
     def play_card(self, player: Player) -> None:

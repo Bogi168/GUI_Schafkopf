@@ -32,6 +32,7 @@ def _context(
     is_active_team=False,
     call_sau=None,
     tricks_remaining=8,
+    trick_history=(),
 ):
     return CardPlayContext(
         current_trick=list(current_trick),
@@ -46,6 +47,7 @@ def _context(
         is_active_team=is_active_team,
         call_sau=call_sau,
         tricks_remaining=tricks_remaining,
+        trick_history=[list(trick) for trick in trick_history],
     )
 
 
@@ -262,16 +264,34 @@ def test_lead_seeks_call_sau_color_when_not_active_team(
 
 
 def test_lead_active_team_avoids_call_sau_color(
-    eichel_sau, eichel_koenig, gruen_seven, gruen_eight, sauspiel_trumps
+    eichel_sau, eichel_koenig, gruen_seven, gruen_eight, herz_seven, sauspiel_trumps
 ):
-    player = _FakePlayer(player_cards=[eichel_koenig, gruen_seven, gruen_eight])
-    context = _context(trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau)
-
-    result = choose_card_to_play(
-        player, [eichel_koenig, gruen_seven, gruen_eight], context
+    player_cards = [eichel_koenig, gruen_seven, gruen_eight, herz_seven]
+    player = _FakePlayer(player_cards=player_cards)
+    context = _context(
+        trumps=sauspiel_trumps,
+        is_active_team=True,
+        call_sau=eichel_sau,
+        tricks_remaining=2,
     )
 
+    result = choose_card_to_play(player, player_cards, context)
+
     assert result == gruen_seven
+
+
+def test_lead_active_team_can_lead_call_sau_color_when_no_trumps_left(
+    eichel_sau, eichel_koenig, gruen_seven, gruen_eight, sauspiel_trumps
+):
+    player_cards = [eichel_koenig, gruen_seven, gruen_eight]
+    player = _FakePlayer(player_cards=player_cards)
+    context = _context(trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau)
+
+    result = choose_card_to_play(player, player_cards, context)
+
+    # Without any trumps left, the chooser can no longer be put under
+    # Sau-Zwang on a later trick - leading the called colour is legit.
+    assert result == eichel_koenig
 
 
 def test_lead_active_team_can_lead_call_sau_color_once_revealed(
@@ -309,12 +329,110 @@ def test_lead_call_sau_holder_runs_away_with_long_suit(
 
 
 def test_lead_call_sau_holder_does_not_run_away_with_short_suit(
+    eichel_sau, gruen_seven, gruen_eight, herz_seven, sauspiel_trumps
+):
+    player_cards = [eichel_sau, gruen_seven, gruen_eight, herz_seven]
+    player = _FakePlayer(player_cards=player_cards)
+    context = _context(
+        trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau, tricks_remaining=2
+    )
+
+    result = choose_card_to_play(player, player_cards, context)
+
+    assert result == gruen_seven
+
+
+def test_lead_call_sau_holder_can_play_call_sau_when_no_trumps_left(
     eichel_sau, gruen_seven, gruen_eight, sauspiel_trumps
 ):
     player_cards = [eichel_sau, gruen_seven, gruen_eight]
     player = _FakePlayer(player_cards=player_cards)
     context = _context(
         trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau, tricks_remaining=8
+    )
+
+    result = choose_card_to_play(player, player_cards, context)
+
+    # Without any trumps left, the holder can no longer be put under
+    # Sau-Zwang on a later trick - playing the call sau now is legit.
+    assert result == eichel_sau
+
+
+def test_lead_call_sau_holder_can_play_call_sau_when_opponents_void_of_trumps(
+    eichel_sau,
+    gruen_seven,
+    gruen_eight,
+    herz_seven,
+    herz_ober,
+    schellen_seven,
+    schellen_eight,
+    schellen_nine,
+    sauspiel_trumps,
+    player_1,
+    player_2,
+    player_3,
+    player_4,
+):
+    player_cards = [eichel_sau, gruen_seven, gruen_eight, herz_seven]
+    player = _FakePlayer(player_cards=player_cards)
+    # player_2 led a trump and both opponents (player_3, player_4) followed
+    # with non-trump cards - Trumpfzwang proves they're void of trumps.
+    trick_history = [
+        [
+            (player_2, herz_ober),
+            (player_3, schellen_seven),
+            (player_4, schellen_eight),
+            (player_1, schellen_nine),
+        ]
+    ]
+    context = _context(
+        trumps=sauspiel_trumps,
+        is_active_team=True,
+        call_sau=eichel_sau,
+        tricks_remaining=2,
+        opponents=[player_3, player_4],
+        trick_history=trick_history,
+    )
+
+    result = choose_card_to_play(player, player_cards, context)
+
+    assert result == eichel_sau
+
+
+def test_lead_call_sau_holder_avoids_when_only_one_opponent_void_of_trumps(
+    eichel_sau,
+    gruen_seven,
+    gruen_eight,
+    herz_seven,
+    herz_ober,
+    herz_unter,
+    schellen_seven,
+    schellen_nine,
+    sauspiel_trumps,
+    player_1,
+    player_2,
+    player_3,
+    player_4,
+):
+    player_cards = [eichel_sau, gruen_seven, gruen_eight, herz_seven]
+    player = _FakePlayer(player_cards=player_cards)
+    # player_4 followed the trump lead with a trump itself, so only
+    # player_3 is proven void - not enough to relax the avoidance.
+    trick_history = [
+        [
+            (player_2, herz_ober),
+            (player_3, schellen_seven),
+            (player_4, herz_unter),
+            (player_1, schellen_nine),
+        ]
+    ]
+    context = _context(
+        trumps=sauspiel_trumps,
+        is_active_team=True,
+        call_sau=eichel_sau,
+        tricks_remaining=2,
+        opponents=[player_3, player_4],
+        trick_history=trick_history,
     )
 
     result = choose_card_to_play(player, player_cards, context)
