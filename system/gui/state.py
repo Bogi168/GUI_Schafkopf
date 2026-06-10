@@ -57,5 +57,9 @@ class TableState:
     choice_announcement_detail_color: Color | None = None
     is_farewell: bool = False
     message: str = ""
+    # Per-seat "lamp" shown next to a bot's avatar while players decide
+    # whether to choose the game: "pending" | "yes" | "no". Only populated
+    # for bot seats, and only during the choosing process.
+    game_choice_lamps: dict[int, str] = field(default_factory=dict)
     game_result: GameResult | None = None
     pending: PendingRequest | None = None

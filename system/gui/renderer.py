@@ -153,6 +153,10 @@ class GUIRenderer(Renderer):
         message = message.strip()
         with self.lock:
             self.state.message = message
+            if message:
+                # Schafkopf.main() reports "no game was selected" this way -
+                # the game-choosing process is over, hide its lamps.
+                self.state.game_choice_lamps = {}
         if message:
             time.sleep(0.6)
 
@@ -211,6 +215,15 @@ class GUIRenderer(Renderer):
                 # the previous hand's last round is no longer relevant.
                 self.state.previous_round_cards = []
                 self.state.show_previous_round = False
+                # A new game-choosing process starts: show a "pending" lamp
+                # next to each bot's avatar.
+                self.state.game_choice_lamps = {
+                    seat: "pending" for seat in (c.LEFT, c.TOP, c.RIGHT)
+                }
+            else:
+                # A game was chosen - the choosing process is over, hide
+                # the lamps immediately.
+                self.state.game_choice_lamps = {}
 
     def render_game_result(self, result: GameResult) -> None:
         with self.lock:
@@ -230,6 +243,10 @@ class GUIRenderer(Renderer):
             self.state.current_game_mode_detail_color = None
 
     def render_want_to_play_decision(self, player: Player, wants_to_play: bool) -> None:
+        seat = self._ensure_seat(player)
+        with self.lock:
+            if seat in self.state.game_choice_lamps:
+                self.state.game_choice_lamps[seat] = "yes" if wants_to_play else "no"
         self._announce_choice(
             tell_player_wants_to_play(
                 player_name=player.player_name, wants_to_play=wants_to_play
@@ -484,6 +501,17 @@ class GUIRenderer(Renderer):
         image = get_bot_image(name, c.AVATAR_SIZE)
         if image is not None:
             self.screen.blit(image, avatar_rect)
+
+        lamp_state = self.state.game_choice_lamps.get(seat)
+        if lamp_state is not None:
+            lamp_color = {
+                "pending": c.LAMP_BLUE,
+                "yes": c.LAMP_GREEN,
+                "no": c.LAMP_RED,
+            }[lamp_state]
+            lamp_center = (avatar_rect.right - c.LAMP_RADIUS, avatar_rect.top + c.LAMP_RADIUS)
+            pygame.draw.circle(self.screen, lamp_color, lamp_center, c.LAMP_RADIUS)
+            pygame.draw.circle(self.screen, c.BLACK, lamp_center, c.LAMP_RADIUS, width=2)
 
         label = name or "..."
         player = self.state.seat_players[seat]

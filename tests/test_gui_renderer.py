@@ -99,6 +99,56 @@ def test_render_game_mode_none_resets_previous_round(renderer, eichel_sau):
     assert renderer.state.show_previous_round is False
 
 
+def test_render_game_mode_none_shows_pending_lamps_for_bots(renderer):
+    renderer.render_game_mode(game_mode_name=None, chooser=None)
+
+    assert renderer.state.game_choice_lamps == {
+        c.LEFT: "pending",
+        c.TOP: "pending",
+        c.RIGHT: "pending",
+    }
+
+
+def test_render_want_to_play_decision_sets_lamp_color(renderer, player_2, player_3):
+    renderer.render_game_mode(game_mode_name=None, chooser=None)
+
+    renderer.render_want_to_play_decision(player=player_2, wants_to_play=True)
+    renderer.render_want_to_play_decision(player=player_3, wants_to_play=False)
+
+    assert renderer.state.game_choice_lamps[c.LEFT] == "yes"
+    assert renderer.state.game_choice_lamps[c.TOP] == "no"
+
+
+def test_render_want_to_play_decision_ignores_human_seat(renderer, player_1):
+    renderer.render_game_mode(game_mode_name=None, chooser=None)
+
+    renderer.render_want_to_play_decision(player=player_1, wants_to_play=True)
+
+    assert c.BOTTOM not in renderer.state.game_choice_lamps
+
+
+def test_render_game_mode_with_game_hides_lamps(renderer):
+    renderer.render_game_mode(game_mode_name=None, chooser=None)
+
+    renderer.render_game_mode(game_mode_name="Sauspiel", chooser=None)
+
+    assert renderer.state.game_choice_lamps == {}
+
+
+def test_render_no_game_message_hides_lamps(renderer):
+    renderer.render_game_mode(game_mode_name=None, chooser=None)
+
+    renderer.render(message=no_game_phrase)
+
+    assert renderer.state.game_choice_lamps == {}
+
+
+def test_draw_bot_seat_with_lamp_does_not_crash(renderer):
+    renderer.render_game_mode(game_mode_name=None, chooser=None)
+
+    renderer._draw((0, 0))
+
+
 def test_ask_play_again_clears_no_game_message(renderer, monkeypatch):
     renderer.state.message = no_game_phrase.strip()
     monkeypatch.setattr(renderer, "_request", lambda **_kwargs: True)

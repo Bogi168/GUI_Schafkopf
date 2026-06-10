@@ -78,6 +78,14 @@ TEXT_LIGHT = (245, 245, 245)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 HIGHLIGHT = (255, 215, 0)
+
+# "Lamp" indicator shown next to a bot's avatar while it decides whether to
+# choose the game. LAMP_GREEN is a brighter, bluer green than TABLE_GREEN so
+# it stands out against the table.
+LAMP_RADIUS = 9
+LAMP_BLUE = (60, 140, 230)
+LAMP_GREEN = (70, 220, 110)
+LAMP_RED = (220, 70, 70)
 OVERLAY_COLOR = (0, 0, 0)
 OVERLAY_ALPHA = 170
 PANEL_BG = (250, 250, 248)
