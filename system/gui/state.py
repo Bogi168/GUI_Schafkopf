@@ -45,6 +45,8 @@ class TableState:
     hand_sizes: list[int] = field(default_factory=lambda: [0, 0, 0, 0])
     human_hand: list[Card] = field(default_factory=list)
     center_cards: list[PlayedCardEntry] = field(default_factory=list)
+    previous_round_cards: list[PlayedCardEntry] = field(default_factory=list)
+    show_previous_round: bool = False
     trick_winner_seat: int | None = None
     current_game_mode: str | None = None
     current_game_mode_chooser_seat: int | None = None

@@ -76,6 +76,7 @@ class GUIRenderer(Renderer):
 
         self._current_buttons: list[Button] = []
         self._current_card_rects: list[pygame.Rect] = []
+        self._previous_round_button: Button | None = None
         self._text_input = TextInput(rect=pygame.Rect(0, 0, 1, 1))
 
     # ------------------------------------------------------------------
@@ -169,6 +170,7 @@ class GUIRenderer(Renderer):
             self.state.trick_winner_seat = seat
         time.sleep(1.0)
         with self.lock:
+            self.state.previous_round_cards = list(self.state.center_cards)
             self.state.center_cards.clear()
             self.state.trick_winner_seat = None
 
@@ -185,6 +187,11 @@ class GUIRenderer(Renderer):
             self.state.current_game_mode_chooser_seat = seat
             self.state.current_game_mode_detail = detail
             self.state.current_game_mode_detail_color = detail_color
+            if game_mode_name is None and chooser is None:
+                # Schafkopf.main() signals the start of a new hand this way -
+                # the previous hand's last round is no longer relevant.
+                self.state.previous_round_cards = []
+                self.state.show_previous_round = False
 
     def render_game_result(self, result: GameResult) -> None:
         with self.lock:
@@ -331,8 +338,19 @@ class GUIRenderer(Renderer):
     # input handling (main thread)
     # ------------------------------------------------------------------
     def _handle_click(self, pos: tuple[int, int]) -> None:
+        if self._previous_round_button is not None and self._previous_round_button.is_clicked(pos):
+            with self.lock:
+                self.state.show_previous_round = not self.state.show_previous_round
+            return
+
         with self.lock:
+            show_previous_round = self.state.show_previous_round
             pending = self.state.pending
+
+        if show_previous_round:
+            with self.lock:
+                self.state.show_previous_round = False
+            return
 
         if pending is None:
             return
@@ -413,6 +431,9 @@ class GUIRenderer(Renderer):
                 self._draw_result_panel()
             if self.state.pending is not None:
                 self._draw_pending(mouse_pos)
+            if self.state.show_previous_round:
+                self._draw_previous_round()
+            self._draw_previous_round_button(mouse_pos)
             if self._game_error:
                 self._draw_error()
 
@@ -572,6 +593,34 @@ class GUIRenderer(Renderer):
         surf = self.fonts.body.render(f"Error: {self._game_error}", True, (255, 90, 90))
         rect = surf.get_rect(midbottom=(c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT - 8))
         self.screen.blit(surf, rect)
+
+    def _draw_previous_round(self) -> None:
+        overlay = pygame.Surface((c.WINDOW_WIDTH, c.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((*c.OVERLAY_COLOR, 130))
+        self.screen.blit(overlay, (0, 0))
+
+        label_surf = self.fonts.heading.render(
+            "Last round - click anywhere to close", True, c.TEXT_LIGHT
+        )
+        label_rect = label_surf.get_rect(midtop=(c.WINDOW_WIDTH // 2, 8))
+        bg = pygame.Surface(label_rect.inflate(24, 12).size, pygame.SRCALPHA)
+        bg.fill((0, 0, 0, 140))
+        self.screen.blit(bg, label_rect.inflate(24, 12).topleft)
+        self.screen.blit(label_surf, label_rect)
+
+        for entry in self.state.previous_round_cards:
+            rect = self._center_card_rect(entry.seat)
+            draw_card_face(self.screen, rect, entry.card, self.fonts)
+
+    def _draw_previous_round_button(self, mouse_pos: tuple[int, int]) -> None:
+        label = "Hide last round" if self.state.show_previous_round else "Show last round"
+        button = Button(
+            rect=c.PREVIOUS_ROUND_BUTTON_RECT,
+            label=label,
+            enabled=bool(self.state.previous_round_cards),
+        )
+        button.draw(self.screen, self.fonts, mouse_pos)
+        self._previous_round_button = button
 
     # ------------------------------------------------------------------
     # modal dialogs

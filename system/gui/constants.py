@@ -61,6 +61,9 @@ SEAT_HAND_ORIENTATION = {
     RIGHT: VERTICAL,
 }
 
+# Toggle button for viewing the cards played in the previous round
+PREVIOUS_ROUND_BUTTON_RECT = pygame.Rect(30, WINDOW_HEIGHT - 74, 170, 44)
+
 # Colors
 TABLE_GREEN = (21, 88, 54)
 TABLE_GREEN_DARK = (15, 68, 42)
