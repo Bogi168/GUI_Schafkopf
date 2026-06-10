@@ -75,7 +75,7 @@ Two implementations exist:
 
 - `renderer.py` — `GUIRenderer`. Game logic (`Schafkopf.main()`) runs on a daemon background thread started by `GUIRenderer.run()`; the pygame event/draw loop runs on the main thread (required on macOS). All shared state lives in a `TableState` (`state.py`) guarded by `self.lock` (`threading.RLock`).
 - Blocking `ask_*` calls use a request/response pattern: the game thread sets `state.pending` to a `PendingRequest` and blocks on a `threading.Event`; the main loop renders the corresponding modal and calls `_submit(value)` on click/keypress, which sets the result and the event.
-- Seats are fixed for the whole game the first time four distinct players are seen (`_ensure_seat`): seat 0 is always the human (bottom), 1/2/3 are the bots (left/top/right) in a consistent order.
+- Seats are fixed for the whole game by `Renderer.set_players()`, called once from `Schafkopf.main()` with the canonical turn-order player list: seat 0 is always the human (bottom), and 1/2/3 (left/top/right) follow in turn order, so the next player to act always sits next to whoever just acted. `_ensure_seat` then just looks up the fixed seat for a player.
 - `constants.py` holds layout/color/font constants, `cards.py` draws card faces/backs, `widgets.py` has `Button`/`TextInput`.
 
 ### Circular-import pattern

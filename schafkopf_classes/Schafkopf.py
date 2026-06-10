@@ -196,6 +196,7 @@ class Schafkopf:
 
     def main(self) -> None:
         self.players = self._create_players()
+        self.renderer.set_players(self.players)
         self.starter: Player = random.choice(self.players)
         while True:
             self.prepare_players()

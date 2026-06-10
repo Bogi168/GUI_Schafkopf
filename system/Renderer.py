@@ -99,6 +99,10 @@ class Renderer(ABC):
         pass
 
     @abstractmethod
+    def set_players(self, players: list[Player]) -> None:
+        pass
+
+    @abstractmethod
     def ask_player_name(self) -> str:
         pass
 
@@ -193,6 +197,9 @@ class ConsoleRenderer(Renderer):
                     detail=detail,
                 )
             )
+
+    def set_players(self, players: list[Player]) -> None:
+        pass
 
     def render_game_result(self, result: GameResult) -> None:
         if result.most_point_teams:

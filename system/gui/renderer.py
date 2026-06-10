@@ -63,7 +63,6 @@ class GUIRenderer(Renderer):
         self.lock = threading.RLock()
         self.state = TableState()
 
-        self._seen_players: list[Player] = []
         self._seat_index: dict[str, int] = {}
 
         self._input_event = threading.Event()
@@ -113,34 +112,24 @@ class GUIRenderer(Renderer):
     # ------------------------------------------------------------------
     # seat assignment
     # ------------------------------------------------------------------
-    def _ensure_seat(self, player: Player) -> int:
-        """Returns the fixed seat index (0=bottom/human, 1=left, 2=top, 3=right).
-
-        The seating is established once, the first time all four players
-        have been seen, with the human always placed at seat 0. It then
-        stays fixed for the rest of the game, regardless of turn order.
+    def set_players(self, players: list[Player]) -> None:
+        """Fixes the seating for the whole game (0=bottom/human, 1=left,
+        2=top, 3=right), preserving the players' turn order so that the
+        next player to act always sits next to the player who just acted.
         """
 
+        human_idx = next(i for i, p in enumerate(players) if not p.is_bot)
+        ordered = players[human_idx:] + players[:human_idx]
         with self.lock:
-            seat = self._seat_index.get(player.player_name)
-            if seat is not None:
-                return seat
+            for i, p in enumerate(ordered):
+                self._seat_index[p.player_name] = i
+                self.state.seat_names[i] = p.player_name
+                self.state.seat_players[i] = p
 
-            if not any(p.player_name == player.player_name for p in self._seen_players):
-                self._seen_players.append(player)
+    def _ensure_seat(self, player: Player) -> int:
+        """Returns the fixed seat index for a player (set up by set_players)."""
 
-            if len(self._seen_players) >= 4:
-                human_idx = next(
-                    i for i, p in enumerate(self._seen_players) if not p.is_bot
-                )
-                ordered = self._seen_players[human_idx:] + self._seen_players[:human_idx]
-                for i, p in enumerate(ordered):
-                    self._seat_index[p.player_name] = i
-                    self.state.seat_names[i] = p.player_name
-                    self.state.seat_players[i] = p
-                return self._seat_index[player.player_name]
-
-            return c.BOTTOM
+        return self._seat_index[player.player_name]
 
     # ------------------------------------------------------------------
     # Renderer interface - render_* (called from the game thread)
