@@ -210,6 +210,7 @@ class Schafkopf:
                 self.renderer.render_game_mode(
                     game_mode_name=game.name,
                     chooser=getattr(game, "game_chooser", None),
+                    detail=game.display_detail(),
                 )
                 game.play_game()
             else:

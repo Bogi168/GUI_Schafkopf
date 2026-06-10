@@ -178,11 +178,17 @@ class GUIRenderer(Renderer):
             self.state.center_cards.clear()
             self.state.trick_winner_seat = None
 
-    def render_game_mode(self, game_mode_name: str | None, chooser: Player | None) -> None:
+    def render_game_mode(
+        self,
+        game_mode_name: str | None,
+        chooser: Player | None,
+        detail: str | None = None,
+    ) -> None:
         seat = self._ensure_seat(chooser) if chooser is not None else None
         with self.lock:
             self.state.current_game_mode = game_mode_name
             self.state.current_game_mode_chooser_seat = seat
+            self.state.current_game_mode_detail = detail
 
     def render_game_result(self, result: GameResult) -> None:
         with self.lock:
@@ -449,6 +455,10 @@ class GUIRenderer(Renderer):
             text = f"{game_mode} - {chooser_name}"
         else:
             text = game_mode
+
+        detail = self.state.current_game_mode_detail
+        if detail is not None:
+            text += f" ({detail})"
 
         surf = self.fonts.body.render(text, True, c.TEXT_LIGHT)
         rect = surf.get_rect(topleft=(36, 36))

@@ -99,6 +99,10 @@ class Solo(Game):
         )
         return kwargs
 
+    def display_detail(self) -> str | None:
+        assert self.trump_color is not None
+        return f"{self.trump_color.display_name} trump"
+
     def create_game_value_calculator(
         self, winners: list[Player]
     ) -> GameValueCalculator:

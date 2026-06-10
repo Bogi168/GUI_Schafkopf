@@ -90,7 +90,12 @@ class Renderer(ABC):
         pass
 
     @abstractmethod
-    def render_game_mode(self, game_mode_name: str | None, chooser: Player | None) -> None:
+    def render_game_mode(
+        self,
+        game_mode_name: str | None,
+        chooser: Player | None,
+        detail: str | None = None,
+    ) -> None:
         pass
 
     @abstractmethod
@@ -174,12 +179,18 @@ class ConsoleRenderer(Renderer):
             )
         )
 
-    def render_game_mode(self, game_mode_name: str | None, chooser: Player | None) -> None:
+    def render_game_mode(
+        self,
+        game_mode_name: str | None,
+        chooser: Player | None,
+        detail: str | None = None,
+    ) -> None:
         if game_mode_name is not None:
             print(
                 tell_chosen_game_mode(
                     game_name=game_mode_name,
                     chooser_name=chooser.player_name if chooser is not None else None,
+                    detail=detail,
                 )
             )
 

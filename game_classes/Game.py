@@ -66,6 +66,7 @@ class Game(ABC):
         self.renderer: Renderer = renderer
         self.amount_game_value_doubles: int = amount_game_value_doubles
         self.players: list[Player] = players
+        self.trump_color: Color | None = trump_color
         self.trumps: list[Card] = [
             card
             for card in cards.full_deck
@@ -134,6 +135,11 @@ class Game(ABC):
         self, winners: list[Player]
     ) -> GameValueCalculator:
         pass
+
+    def display_detail(self) -> str | None:
+        """Optional extra info about the chosen game (e.g. trump or Sau color)."""
+
+        return None
 
     def sort_player_hands(self) -> None:
         """
