@@ -203,6 +203,7 @@ def test_play_card_passes_context_for_bot_players(
     assert context.tricks_remaining == len(bot.player_cards)
     assert context.team_knowledge == TeamKnowledge(teammates=[], opponents=[], unknown=[])
     assert context.is_active_team is False
+    assert context.call_sau is None
 
 
 def test_play_card_context_marks_active_team(
@@ -227,6 +228,31 @@ def test_play_card_context_marks_active_team(
 
     context = bot.get_card_play_decision.call_args.kwargs["context"]
     assert context.is_active_team is True
+
+
+def test_play_card_context_includes_call_sau(
+    team_alone_player_1, eichel_sau, eichel_ten, sauspiel_trumps
+):
+    bot = MagicMock()
+    bot.is_bot = True
+    bot.player_cards = [eichel_ten, eichel_sau]
+    bot.get_card_play_decision = MagicMock(return_value=eichel_ten)
+
+    round_manager = RoundManager(
+        players=[bot],
+        player_teams={bot: team_alone_player_1},
+        trumps=sauspiel_trumps,
+        card_power_calculator=SauspielCardPowerCalculator(),
+        card_decision_validator=RegularTrumpTypeCardDecisionValidator(),
+        active_team=team_alone_player_1,
+        renderer=MagicMock(),
+    )
+    round_manager.call_sau = eichel_sau
+
+    round_manager.play_card(player=bot)
+
+    context = bot.get_card_play_decision.call_args.kwargs["context"]
+    assert context.call_sau == eichel_sau
 
 
 # get_round_winner / reward_round_winner

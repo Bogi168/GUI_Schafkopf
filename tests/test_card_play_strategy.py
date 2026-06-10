@@ -30,6 +30,7 @@ def _context(
     is_ramsch=False,
     is_tout=False,
     is_active_team=False,
+    call_sau=None,
     tricks_remaining=8,
 ):
     return CardPlayContext(
@@ -43,6 +44,7 @@ def _context(
         is_ramsch=is_ramsch,
         is_tout=is_tout,
         is_active_team=is_active_team,
+        call_sau=call_sau,
         tricks_remaining=tricks_remaining,
     )
 
@@ -241,6 +243,95 @@ def test_lead_fallback_picks_lowest_point_trump(
     result = choose_card_to_play(player, [herz_unter, eichel_unter], context)
 
     assert result == herz_unter
+
+
+# choose_card_to_play - leading, call sau seeking/avoiding/running away
+
+
+def test_lead_seeks_call_sau_color_when_not_active_team(
+    eichel_sau, eichel_koenig, eichel_seven, gruen_unter, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[eichel_koenig, eichel_seven, gruen_unter])
+    context = _context(trumps=sauspiel_trumps, is_active_team=False, call_sau=eichel_sau)
+
+    result = choose_card_to_play(
+        player, [eichel_koenig, eichel_seven, gruen_unter], context
+    )
+
+    assert result == eichel_seven
+
+
+def test_lead_active_team_avoids_call_sau_color(
+    eichel_sau, eichel_koenig, gruen_seven, gruen_eight, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[eichel_koenig, gruen_seven, gruen_eight])
+    context = _context(trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau)
+
+    result = choose_card_to_play(
+        player, [eichel_koenig, gruen_seven, gruen_eight], context
+    )
+
+    assert result == gruen_seven
+
+
+def test_lead_active_team_can_lead_call_sau_color_once_revealed(
+    eichel_sau, eichel_koenig, gruen_seven, gruen_eight, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[eichel_koenig, gruen_seven, gruen_eight])
+    context = _context(
+        trumps=sauspiel_trumps,
+        is_active_team=True,
+        call_sau=eichel_sau,
+        history=[eichel_sau],
+    )
+
+    result = choose_card_to_play(
+        player, [eichel_koenig, gruen_seven, gruen_eight], context
+    )
+
+    assert result == eichel_koenig
+
+
+def test_lead_call_sau_holder_runs_away_with_long_suit(
+    eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_unter, sauspiel_trumps
+):
+    player_cards = [eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_unter]
+    player = _FakePlayer(player_cards=player_cards)
+    context = _context(
+        trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau, tricks_remaining=8
+    )
+
+    result = choose_card_to_play(player, player_cards, context)
+
+    assert result == eichel_sau
+
+
+def test_lead_call_sau_holder_does_not_run_away_with_short_suit(
+    eichel_sau, gruen_seven, gruen_eight, sauspiel_trumps
+):
+    player_cards = [eichel_sau, gruen_seven, gruen_eight]
+    player = _FakePlayer(player_cards=player_cards)
+    context = _context(
+        trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau, tricks_remaining=8
+    )
+
+    result = choose_card_to_play(player, player_cards, context)
+
+    assert result == gruen_seven
+
+
+def test_lead_call_sau_holder_does_not_run_away_late_game(
+    eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_unter, sauspiel_trumps
+):
+    player_cards = [eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_unter]
+    player = _FakePlayer(player_cards=player_cards)
+    context = _context(
+        trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau, tricks_remaining=2
+    )
+
+    result = choose_card_to_play(player, player_cards, context)
+
+    assert result == eichel_seven
 
 
 # choose_card_to_play - following, teammate currently winning

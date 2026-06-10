@@ -37,6 +37,7 @@ class CardPlayContext:
     is_ramsch: bool
     is_tout: bool
     is_active_team: bool
+    call_sau: Card | None
     tricks_remaining: int
 
 
@@ -103,6 +104,24 @@ def _non_trump_suit_count(cards: list[Card], color: Color, trumps: list[Card]) -
     return sum(1 for card in cards if card.card_color == color and card not in trumps)
 
 
+def _avoid_call_sau_leads(
+    cards: list[Card], call_sau: Card, player: Player, is_active_team: bool
+) -> list[Card]:
+    """Cards that don't risk exposing the call sau to a Sau-Zwang.
+
+    The call sau holder shouldn't volunteer the Sau itself unless they're
+    "running away" with it, and the chooser shouldn't lead the called
+    colour at all - either would force the Sau into play and let the
+    opposing team trump it away if they're void.
+    """
+
+    if call_sau in player.player_cards:
+        return [card for card in cards if card != call_sau]
+    if is_active_team:
+        return [card for card in cards if card.card_color != call_sau.card_color]
+    return cards
+
+
 def choose_card_to_play(
     player: Player, legal_cards: list[Card], context: CardPlayContext
 ) -> Card:
@@ -135,6 +154,35 @@ def _choose_lead_card(
         # leading the strongest card available.
         return max(legal_cards, key=cpc.get_card_power)
 
+    call_sau = context.call_sau
+    call_sau_in_play = (
+        call_sau is not None and call_sau not in context.played_cards_history
+    )
+    if call_sau_in_play:
+        if call_sau in player.player_cards:
+            if (
+                context.tricks_remaining >= _EARLY_GAME_TRICKS
+                and _non_trump_suit_count(player.player_cards, call_sau.card_color, trumps)
+                >= 4
+            ):
+                # Davonlaufen: our suit in the called colour is long enough
+                # that leading the Sau now is safe - bank its points before
+                # anyone can become void in this colour and trump it away.
+                return call_sau
+        elif not context.is_active_team:
+            # Seeking: lead a low card of the called colour, hoping our
+            # still-unknown partner is void and can trump the Sau away.
+            seek_candidates = [
+                card
+                for card in legal_cards
+                if card.card_color == call_sau.card_color and card not in trumps
+            ]
+            if seek_candidates:
+                return min(
+                    seek_candidates,
+                    key=lambda card: (card.card_type.points, cpc.get_card_power(card)),
+                )
+
     unseen = _remaining_unseen_cards(
         own_hand=player.player_cards,
         played_cards_history=context.played_cards_history,
@@ -161,6 +209,13 @@ def _choose_lead_card(
         return max(trump_legal, key=cpc.get_card_power)
 
     non_trump_legal = [card for card in legal_cards if card not in trumps]
+    if call_sau_in_play:
+        filtered = _avoid_call_sau_leads(
+            non_trump_legal, call_sau, player, context.is_active_team
+        )
+        if filtered:
+            non_trump_legal = filtered
+
     if non_trump_legal:
         aces = [card for card in non_trump_legal if card.card_type == Type.SAU]
         if aces and context.tricks_remaining >= _EARLY_GAME_TRICKS:
