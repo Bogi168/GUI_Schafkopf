@@ -21,6 +21,7 @@ import pygame
 
 from system.Renderer import ColorChoiceKind, Renderer, YesNoKind
 from system.gui import constants as c
+from system.gui.bot_images import get_bot_image
 from system.gui.cards import draw_card_back, draw_card_face
 from system.gui.state import PendingRequest, PlayedCardEntry, TableState
 from system.gui.suit_images import get_suit_image
@@ -466,15 +467,15 @@ class GUIRenderer(Renderer):
         name_pos = c.SEAT_NAME_POS[seat]
         name = self.state.seat_names[seat]
 
-        if self.state.trick_winner_seat == seat:
-            pygame.draw.circle(self.screen, c.HIGHLIGHT, avatar_pos, c.AVATAR_RADIUS + 6, width=4)
+        avatar_rect = pygame.Rect(0, 0, c.AVATAR_SIZE, c.AVATAR_SIZE)
+        avatar_rect.center = avatar_pos
 
-        pygame.draw.circle(self.screen, c.AVATAR_COLORS[seat], avatar_pos, c.AVATAR_RADIUS)
-        pygame.draw.circle(self.screen, c.BLACK, avatar_pos, c.AVATAR_RADIUS, width=2)
-        initial = self._avatar_label(name)
-        font = self.fonts.title if len(initial) == 1 else self.fonts.heading
-        initial_surf = font.render(initial, True, c.WHITE)
-        self.screen.blit(initial_surf, initial_surf.get_rect(center=avatar_pos))
+        if self.state.trick_winner_seat == seat:
+            pygame.draw.rect(self.screen, c.HIGHLIGHT, avatar_rect.inflate(8, 8), width=4, border_radius=8)
+
+        image = get_bot_image(name, c.AVATAR_SIZE)
+        if image is not None:
+            self.screen.blit(image, avatar_rect)
 
         label = name or "..."
         player = self.state.seat_players[seat]
@@ -832,15 +833,6 @@ class GUIRenderer(Renderer):
         cx, cy = c.CENTER
         dx, dy = c.CENTER_CARD_OFFSETS[seat]
         return pygame.Rect(cx + dx - width // 2, cy + dy - height // 2, width, height)
-
-    @staticmethod
-    def _avatar_label(name: str) -> str:
-        """A short label for a bot's avatar circle (e.g. "Bot 1" -> "B1")."""
-
-        parts = name.split()
-        if len(parts) >= 2:
-            return (parts[0][0] + parts[-1][0]).upper()
-        return name[:2].upper() if name else "?"
 
     @staticmethod
     def _wrap_text(text: str, font: pygame.font.Font, max_width: int) -> list[str]:

@@ -32,22 +32,22 @@ CENTER_CARD_OFFSETS = {
 }
 
 # Avatar positions and name label positions for the bot seats
-AVATAR_RADIUS = 35
+AVATAR_SIZE = 96
 SEAT_AVATAR_POS = {
-    LEFT: (90, 200),
-    TOP: (600, 60),
-    RIGHT: (1110, 200),
+    LEFT: (90, 205),
+    TOP: (600, 70),
+    RIGHT: (1110, 205),
 }
 SEAT_NAME_POS = {
     BOTTOM: (600, 595),
-    LEFT: (90, 245),
-    TOP: (600, 105),
-    RIGHT: (1110, 245),
+    LEFT: (90, 265),
+    TOP: (600, 130),
+    RIGHT: (1110, 265),
 }
 SEAT_HAND_CENTER = {
-    LEFT: (90, 400),
-    TOP: (600, 165),
-    RIGHT: (1110, 400),
+    LEFT: (90, 410),
+    TOP: (600, 188),
+    RIGHT: (1110, 410),
 }
 
 # Hand-of-cards layout direction per seat. Left/right bots fan their hidden
@@ -78,11 +78,6 @@ TEXT_LIGHT = (245, 245, 245)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 HIGHLIGHT = (255, 215, 0)
-AVATAR_COLORS = {
-    LEFT: (70, 130, 180),
-    TOP: (180, 90, 70),
-    RIGHT: (90, 150, 90),
-}
 OVERLAY_COLOR = (0, 0, 0)
 OVERLAY_ALPHA = 170
 PANEL_BG = (250, 250, 248)
