@@ -1,4 +1,10 @@
-from money_handling.WinnersSelector import WinnersSelector, RamschWinnersSelector
+from money_handling.WinnersSelector import (
+    WinnersSelector,
+    RamschWinnersSelector,
+    ToutWinnersSelector,
+    WenzToutWinnersSelector,
+    SoloToutWinnersSelector,
+)
 
 
 def test_alone_most_points_teams(
@@ -303,3 +309,65 @@ def test_ramsch_two_most_point_teams(
         ],
         key=lambda x: x.player_name,
     )
+
+
+# Tout family: all-or-nothing - the game chooser only wins by taking every
+# trick, otherwise the whole opposing side wins
+
+
+def test_tout_game_chooser_wins_by_taking_every_trick(
+    team_alone_player_1, team_three_players_2_3_4, all_cards
+):
+    teams = [team_alone_player_1, team_three_players_2_3_4]
+    game_chooser = team_alone_player_1.players[0]
+    game_chooser.collected_cards = list(all_cards)
+
+    winners_selector = ToutWinnersSelector(
+        teams=teams,
+        active_team=team_alone_player_1,
+        game_chooser=game_chooser,
+        full_deck=all_cards,
+    )
+
+    assert winners_selector.get_game_winners() == [game_chooser]
+
+
+def test_tout_opposing_side_wins_if_chooser_misses_a_single_trick(
+    team_alone_player_1, team_three_players_2_3_4, all_cards
+):
+    teams = [team_alone_player_1, team_three_players_2_3_4]
+    game_chooser = team_alone_player_1.players[0]
+    # missing the very last card -> not a clean sweep
+    game_chooser.collected_cards = list(all_cards[:-1])
+
+    winners_selector = ToutWinnersSelector(
+        teams=teams,
+        active_team=team_alone_player_1,
+        game_chooser=game_chooser,
+        full_deck=all_cards,
+    )
+
+    assert sorted(
+        winners_selector.get_game_winners(), key=lambda x: x.player_name
+    ) == sorted(team_three_players_2_3_4.players, key=lambda x: x.player_name)
+
+
+def test_wenz_tout_and_solo_tout_match_tout_winners(
+    team_alone_player_1, team_three_players_2_3_4, all_cards
+):
+    teams = [team_alone_player_1, team_three_players_2_3_4]
+    game_chooser = team_alone_player_1.players[0]
+    game_chooser.collected_cards = list(all_cards)
+
+    for cls in (
+        ToutWinnersSelector,
+        WenzToutWinnersSelector,
+        SoloToutWinnersSelector,
+    ):
+        winners_selector = cls(
+            teams=teams,
+            active_team=team_alone_player_1,
+            game_chooser=game_chooser,
+            full_deck=all_cards,
+        )
+        assert winners_selector.get_game_winners() == [game_chooser]
