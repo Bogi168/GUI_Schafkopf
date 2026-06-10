@@ -217,6 +217,12 @@ class GUIRenderer(Renderer):
             # this hand's last trick while the player is asked to play again.
             self.state.previous_round_cards = []
             self.state.show_previous_round = False
+            # Likewise, the top-left game mode badge must not keep showing
+            # this hand's game while the player is asked to play again.
+            self.state.current_game_mode = None
+            self.state.current_game_mode_chooser_seat = None
+            self.state.current_game_mode_detail = None
+            self.state.current_game_mode_detail_color = None
 
     def render_want_to_play_decision(self, player: Player, wants_to_play: bool) -> None:
         self._announce_choice(

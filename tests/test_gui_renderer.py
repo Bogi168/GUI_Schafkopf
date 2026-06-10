@@ -4,6 +4,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import pytest
 
+from card_classes.Cards import Color
 from system.gui import constants as c
 from system.gui.renderer import GUIRenderer
 from system.gui.state import PlayedCardEntry
@@ -63,6 +64,28 @@ def test_render_game_result_resets_previous_round(renderer, players, eichel_sau)
 
     assert renderer.state.previous_round_cards == []
     assert renderer.state.show_previous_round is False
+
+
+def test_render_game_result_resets_game_mode_badge(renderer, players):
+    renderer.state.current_game_mode = "Sauspiel"
+    renderer.state.current_game_mode_chooser_seat = 0
+    renderer.state.current_game_mode_detail = "Eichel Sau"
+    renderer.state.current_game_mode_detail_color = Color.EICHEL
+
+    renderer.render_game_result(
+        result=GameResult(
+            most_point_teams=[],
+            winners=[],
+            game_value=0,
+            game_value_breakdown="",
+            players=players,
+        )
+    )
+
+    assert renderer.state.current_game_mode is None
+    assert renderer.state.current_game_mode_chooser_seat is None
+    assert renderer.state.current_game_mode_detail is None
+    assert renderer.state.current_game_mode_detail_color is None
 
 
 def test_render_game_mode_none_resets_previous_round(renderer, eichel_sau):
