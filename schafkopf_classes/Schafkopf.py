@@ -213,7 +213,9 @@ class Schafkopf:
             self.renderer.render_game_mode(game_mode_name=None, chooser=None)
             for player in self.players:
                 self.renderer.render_hand(player=player, cards=player.player_cards)
-                wants_to_play = player.ask_want_choose_game()
+                wants_to_play = player.ask_want_choose_game(
+                    players_who_want_to_play_count=len(self.game_choosers)
+                )
                 self.renderer.render_want_to_play_decision(
                     player=player, wants_to_play=wants_to_play
                 )

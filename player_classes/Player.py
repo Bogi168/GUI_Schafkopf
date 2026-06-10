@@ -2,6 +2,12 @@ from __future__ import annotations
 from typing import Callable, TYPE_CHECKING
 from card_classes.Cards import Color, Type
 from system.Renderer import YesNoKind, ColorChoiceKind
+from player_classes.bot_strategy import (
+    best_sau_color,
+    best_trump_color,
+    choose_preferred_game_mode,
+    wants_to_play,
+)
 import random
 
 if TYPE_CHECKING:
@@ -61,9 +67,11 @@ class Player:
         self.renderer.render_hand(player=self, cards=self.player_cards)
         return self.renderer.ask_yes_no(player=self, kind=YesNoKind.DOUBLE_GAME_VALUE)
 
-    def ask_want_choose_game(self) -> bool:
+    def ask_want_choose_game(self, players_who_want_to_play_count: int) -> bool:
         """
         Asks the player whether he wants to choose a game or not
+        :param players_who_want_to_play_count: The number of players asked before this one who already want to play
+        :type players_who_want_to_play_count: int
         :return: A boolean indicating whether the player wants to choose a game or not
         :rtype: bool
         """
@@ -231,30 +239,35 @@ class Bot(Player):
     def ask_double_game_value(self) -> bool:
         return False
 
-    def ask_want_choose_game(self) -> bool:
-        return True
+    def ask_want_choose_game(self, players_who_want_to_play_count: int) -> bool:
+        return wants_to_play(
+            player_cards=self.player_cards,
+            players_who_want_to_play_count=players_who_want_to_play_count,
+        )
 
     def choose_game_mode(
         self,
         prev_game_mode: type[Game] | None,
         quitting_possible: bool = False,
     ) -> type[Game] | None:
-        if quitting_possible:
-            return None
         valid = self.game_decision_validator.get_valid_game_mode_decisions(
             prev_game_mode=prev_game_mode, player_cards=self.player_cards
         )
-        return random.choice(list(valid.values()))
+        return choose_preferred_game_mode(
+            player_cards=self.player_cards,
+            options=valid,
+            can_pass=quitting_possible,
+        )
 
     def get_sau_color(self) -> Color:
         valid = self.game_decision_validator.get_valid_call_sau_color_inputs(
             player_cards=self.player_cards
         )
-        return random.choice(list(valid.values()))
+        return best_sau_color(player_cards=self.player_cards, options=valid)
 
     def get_trump_color(self) -> Color:
         valid = self.game_decision_validator.get_valid_solo_color_inputs()
-        return random.choice(list(valid.values()))
+        return best_trump_color(player_cards=self.player_cards, options=valid)
 
     def ask_for_hochzeit(self) -> bool:
         return False
