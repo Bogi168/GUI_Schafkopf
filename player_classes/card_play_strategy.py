@@ -109,10 +109,10 @@ def _avoid_call_sau_leads(
 ) -> list[Card]:
     """Cards that don't risk exposing the call sau to a Sau-Zwang.
 
-    The call sau holder shouldn't volunteer the Sau itself unless they're
-    "running away" with it, and the chooser shouldn't lead the called
-    colour at all - either would force the Sau into play and let the
-    opposing team trump it away if they're void.
+    The call sau holder should never volunteer the Sau itself as a lead,
+    and the chooser shouldn't lead the called colour at all - either would
+    force the Sau into play and let the opposing team trump it away if
+    they're void.
     """
 
     if call_sau in player.player_cards:
@@ -166,9 +166,20 @@ def _choose_lead_card(
                 >= 4
             ):
                 # Davonlaufen: our suit in the called colour is long enough
-                # that leading the Sau now is safe - bank its points before
-                # anyone can become void in this colour and trump it away.
-                return call_sau
+                # that we can lead a non-Sau card of it without giving the
+                # Sau itself away - keep it hidden until it's safer to play.
+                run_away_candidates = [
+                    card
+                    for card in legal_cards
+                    if card.card_color == call_sau.card_color
+                    and card not in trumps
+                    and card != call_sau
+                ]
+                if run_away_candidates:
+                    return min(
+                        run_away_candidates,
+                        key=lambda card: (card.card_type.points, cpc.get_card_power(card)),
+                    )
         elif not context.is_active_team:
             # Seeking: lead a low card of the called colour, hoping our
             # still-unknown partner is void and can trump the Sau away.

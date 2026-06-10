@@ -293,9 +293,9 @@ def test_lead_active_team_can_lead_call_sau_color_once_revealed(
 
 
 def test_lead_call_sau_holder_runs_away_with_long_suit(
-    eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_unter, sauspiel_trumps
+    eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_seven, sauspiel_trumps
 ):
-    player_cards = [eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_unter]
+    player_cards = [eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_seven]
     player = _FakePlayer(player_cards=player_cards)
     context = _context(
         trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau, tricks_remaining=8
@@ -303,7 +303,9 @@ def test_lead_call_sau_holder_runs_away_with_long_suit(
 
     result = choose_card_to_play(player, player_cards, context)
 
-    assert result == eichel_sau
+    # Davonlaufen: lead a non-Sau card of the called colour, keeping the
+    # Sau itself hidden.
+    assert result == eichel_seven
 
 
 def test_lead_call_sau_holder_does_not_run_away_with_short_suit(
@@ -321,9 +323,9 @@ def test_lead_call_sau_holder_does_not_run_away_with_short_suit(
 
 
 def test_lead_call_sau_holder_does_not_run_away_late_game(
-    eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_unter, sauspiel_trumps
+    eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_seven, sauspiel_trumps
 ):
-    player_cards = [eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_unter]
+    player_cards = [eichel_sau, eichel_koenig, eichel_ten, eichel_seven, gruen_seven]
     player = _FakePlayer(player_cards=player_cards)
     context = _context(
         trumps=sauspiel_trumps, is_active_team=True, call_sau=eichel_sau, tricks_remaining=2
@@ -331,7 +333,7 @@ def test_lead_call_sau_holder_does_not_run_away_late_game(
 
     result = choose_card_to_play(player, player_cards, context)
 
-    assert result == eichel_seven
+    assert result == gruen_seven
 
 
 # choose_card_to_play - following, teammate currently winning
