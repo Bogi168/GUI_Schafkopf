@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 import pygame
 
+from card_classes.Cards import Color
 from system.Renderer import ColorChoiceKind, Renderer, YesNoKind
 from system.gui import constants as c
 from system.gui.bot_images import get_bot_image
@@ -38,7 +39,7 @@ from system.text import (
 )
 
 if TYPE_CHECKING:
-    from card_classes.Cards import Card, Color
+    from card_classes.Cards import Card
     from game_classes.Game import Game
     from player_classes.Player import Player
     from system.Renderer import GameResult
@@ -55,6 +56,8 @@ _YES_NO_PROMPTS: dict[YesNoKind, Callable[[str], str]] = {
 
 _CHOICE_ANNOUNCEMENT_DELAY = 1.6
 _FAREWELL_DELAY = 5.0
+
+_FAREWELL_SUITS = [Color.EICHEL, Color.GRUEN, Color.HERZ, Color.SCHELLEN]
 
 
 class GUIRenderer(Renderer):
@@ -158,6 +161,7 @@ class GUIRenderer(Renderer):
             self.state.choice_announcement = message.strip()
             self.state.choice_announcement_detail = None
             self.state.choice_announcement_detail_color = None
+            self.state.is_farewell = True
         time.sleep(_FAREWELL_DELAY)
         with self.lock:
             self._should_quit = True
@@ -449,7 +453,10 @@ class GUIRenderer(Renderer):
             self._draw_game_mode_badge()
 
             if self.state.choice_announcement:
-                self._draw_choice_announcement()
+                if self.state.is_farewell:
+                    self._draw_farewell()
+                else:
+                    self._draw_choice_announcement()
             if self.state.message:
                 self._draw_message()
             if self.state.game_result is not None:
@@ -605,6 +612,46 @@ class GUIRenderer(Renderer):
         for piece in pieces:
             self.screen.blit(piece, (x, rect.centery - piece.get_height() // 2))
             x += piece.get_width()
+
+    def _draw_farewell(self) -> None:
+        text = self.state.choice_announcement
+        assert text is not None
+
+        overlay = pygame.Surface((c.WINDOW_WIDTH, c.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((*c.OVERLAY_COLOR, c.OVERLAY_ALPHA))
+        self.screen.blit(overlay, (0, 0))
+
+        title_surf = self.fonts.announcement.render(text, True, c.TEXT_DARK)
+        subtitle_surf = self.fonts.heading.render("See you next time!", True, c.TEXT_DIM)
+        suit_imgs = [get_suit_image(color, height=40) for color in _FAREWELL_SUITS]
+        suit_spacing = 24
+        suits_width = sum(img.get_width() for img in suit_imgs) + suit_spacing * (len(suit_imgs) - 1)
+
+        content_width = max(title_surf.get_width(), subtitle_surf.get_width(), suits_width)
+        content_height = (
+            suit_imgs[0].get_height()
+            + 28
+            + title_surf.get_height()
+            + 14
+            + subtitle_surf.get_height()
+        )
+
+        panel_rect = pygame.Rect(0, 0, content_width + 100, content_height + 70)
+        panel_rect.center = (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2)
+        pygame.draw.rect(self.screen, c.PANEL_BG, panel_rect, border_radius=24)
+        pygame.draw.rect(self.screen, c.HIGHLIGHT, panel_rect, width=5, border_radius=24)
+
+        x = panel_rect.centerx - suits_width // 2
+        y = panel_rect.top + 30
+        for img in suit_imgs:
+            self.screen.blit(img, (x, y))
+            x += img.get_width() + suit_spacing
+        y += suit_imgs[0].get_height() + 28
+
+        self.screen.blit(title_surf, title_surf.get_rect(midtop=(panel_rect.centerx, y)))
+        y += title_surf.get_height() + 14
+
+        self.screen.blit(subtitle_surf, subtitle_surf.get_rect(midtop=(panel_rect.centerx, y)))
 
     def _draw_message(self) -> None:
         surf = self.fonts.body.render(self.state.message, True, c.TEXT_LIGHT)

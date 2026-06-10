@@ -55,6 +55,7 @@ class TableState:
     choice_announcement: str | None = None
     choice_announcement_detail: str | None = None
     choice_announcement_detail_color: Color | None = None
+    is_farewell: bool = False
     message: str = ""
     game_result: GameResult | None = None
     pending: PendingRequest | None = None
