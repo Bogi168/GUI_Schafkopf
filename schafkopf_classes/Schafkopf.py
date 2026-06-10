@@ -200,12 +200,17 @@ class Schafkopf:
         while True:
             self.prepare_players()
             self.prepare_cards()
+            self.renderer.render_game_mode(game_mode_name=None, chooser=None)
             for player in self.players:
                 self.renderer.render_hand(player=player, cards=player.player_cards)
                 if player.ask_want_choose_game():
                     self.game_choosers.append(player)
             game: Game | None = self.players_choose_game()
             if game is not None:
+                self.renderer.render_game_mode(
+                    game_mode_name=game.name,
+                    chooser=getattr(game, "game_chooser", None),
+                )
                 game.play_game()
             else:
                 self.renderer.render(message=no_game_phrase)

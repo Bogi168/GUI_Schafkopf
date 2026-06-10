@@ -65,6 +65,12 @@ def tell_player_money(player_name: str, money: int) -> str:
     return f"{player_name:<6} has {money:^5} cents"
 
 
+def tell_chosen_game_mode(game_name: str, chooser_name: str | None) -> str:
+    if chooser_name is None:
+        return f"\n{game_name} is being played."
+    return f"\n{chooser_name} is playing a {game_name}."
+
+
 no_game_phrase = "\nNo game was selected."
 
 words_of_thanks = "\nThank you for playing!"

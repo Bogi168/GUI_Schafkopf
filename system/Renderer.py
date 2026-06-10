@@ -21,6 +21,7 @@ from system.text import (
     show_player_cards,
     show_played_card,
     show_collector_of_cards,
+    tell_chosen_game_mode,
     tell_most_point_teams,
     tell_team_points,
     tell_team_players,
@@ -86,6 +87,10 @@ class Renderer(ABC):
 
     @abstractmethod
     def render_game_result(self, result: GameResult) -> None:
+        pass
+
+    @abstractmethod
+    def render_game_mode(self, game_mode_name: str | None, chooser: Player | None) -> None:
         pass
 
     @abstractmethod
@@ -168,6 +173,15 @@ class ConsoleRenderer(Renderer):
                 player_name=winner.player_name, collected_cards=winner.collected_cards
             )
         )
+
+    def render_game_mode(self, game_mode_name: str | None, chooser: Player | None) -> None:
+        if game_mode_name is not None:
+            print(
+                tell_chosen_game_mode(
+                    game_name=game_mode_name,
+                    chooser_name=chooser.player_name if chooser is not None else None,
+                )
+            )
 
     def render_game_result(self, result: GameResult) -> None:
         if result.most_point_teams:

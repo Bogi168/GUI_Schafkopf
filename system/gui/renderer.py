@@ -178,6 +178,12 @@ class GUIRenderer(Renderer):
             self.state.center_cards.clear()
             self.state.trick_winner_seat = None
 
+    def render_game_mode(self, game_mode_name: str | None, chooser: Player | None) -> None:
+        seat = self._ensure_seat(chooser) if chooser is not None else None
+        with self.lock:
+            self.state.current_game_mode = game_mode_name
+            self.state.current_game_mode_chooser_seat = seat
+
     def render_game_result(self, result: GameResult) -> None:
         with self.lock:
             self.state.game_result = result
@@ -355,6 +361,7 @@ class GUIRenderer(Renderer):
             self._draw_bot_seat(c.RIGHT, mouse_pos)
             self._draw_human_seat()
             self._draw_center()
+            self._draw_game_mode_badge()
 
             if self.state.message:
                 self._draw_message()
@@ -430,6 +437,25 @@ class GUIRenderer(Renderer):
         for entry in self.state.center_cards:
             rect = self._center_card_rect(entry.seat)
             draw_card_face(self.screen, rect, entry.card, self.fonts)
+
+    def _draw_game_mode_badge(self) -> None:
+        game_mode = self.state.current_game_mode
+        if game_mode is None:
+            return
+
+        chooser_seat = self.state.current_game_mode_chooser_seat
+        if chooser_seat is not None:
+            chooser_name = self.state.seat_names[chooser_seat] or "?"
+            text = f"{game_mode} - {chooser_name}"
+        else:
+            text = game_mode
+
+        surf = self.fonts.body.render(text, True, c.TEXT_LIGHT)
+        rect = surf.get_rect(topleft=(36, 36))
+        bg = pygame.Surface(rect.inflate(20, 12).size, pygame.SRCALPHA)
+        bg.fill((0, 0, 0, 140))
+        self.screen.blit(bg, rect.inflate(20, 12).topleft)
+        self.screen.blit(surf, rect)
 
     def _draw_message(self) -> None:
         surf = self.fonts.body.render(self.state.message, True, c.TEXT_LIGHT)
