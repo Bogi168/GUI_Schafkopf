@@ -99,6 +99,7 @@ class RoundManager:
             team_knowledge=team_knowledge,
             is_ramsch=self.is_ramsch,
             is_tout=self.is_tout,
+            is_active_team=self.player_teams[player] is self.active_team,
             tricks_remaining=len(player.player_cards),
         )
 

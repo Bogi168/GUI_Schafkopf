@@ -29,6 +29,7 @@ def _context(
     unknown=(),
     is_ramsch=False,
     is_tout=False,
+    is_active_team=False,
     tricks_remaining=8,
 ):
     return CardPlayContext(
@@ -41,6 +42,7 @@ def _context(
         ),
         is_ramsch=is_ramsch,
         is_tout=is_tout,
+        is_active_team=is_active_team,
         tricks_remaining=tricks_remaining,
     )
 
@@ -177,6 +179,37 @@ def test_lead_guaranteed_trump_is_played(eichel_ober, eichel_seven, sauspiel_tru
     result = choose_card_to_play(player, [eichel_ober, eichel_seven], context)
 
     assert result == eichel_ober
+
+
+def test_lead_active_team_draws_trump_early(eichel_sau, gruen_ober, sauspiel_trumps):
+    player = _FakePlayer(player_cards=[gruen_ober, eichel_sau])
+    context = _context(trumps=sauspiel_trumps, is_active_team=True, tricks_remaining=8)
+
+    result = choose_card_to_play(player, [gruen_ober, eichel_sau], context)
+
+    assert result == gruen_ober
+
+
+def test_lead_non_active_team_does_not_draw_trump_early(
+    eichel_sau, gruen_ober, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[gruen_ober, eichel_sau])
+    context = _context(trumps=sauspiel_trumps, is_active_team=False, tricks_remaining=8)
+
+    result = choose_card_to_play(player, [gruen_ober, eichel_sau], context)
+
+    assert result == eichel_sau
+
+
+def test_lead_active_team_trump_draw_only_applies_early_game(
+    eichel_sau, gruen_ober, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[gruen_ober, eichel_sau])
+    context = _context(trumps=sauspiel_trumps, is_active_team=True, tricks_remaining=2)
+
+    result = choose_card_to_play(player, [gruen_ober, eichel_sau], context)
+
+    assert result == eichel_sau
 
 
 def test_lead_early_sau_is_played(eichel_sau, gruen_seven, gruen_koenig, sauspiel_trumps):

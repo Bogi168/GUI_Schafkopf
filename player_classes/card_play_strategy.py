@@ -36,6 +36,7 @@ class CardPlayContext:
     team_knowledge: TeamKnowledge
     is_ramsch: bool
     is_tout: bool
+    is_active_team: bool
     tricks_remaining: int
 
 
@@ -147,6 +148,17 @@ def _choose_lead_card(
     if guaranteed_trumps:
         # Drain the opponents' trumps with a card nobody can beat.
         return max(guaranteed_trumps, key=cpc.get_card_power)
+
+    if (
+        context.is_active_team
+        and trump_legal
+        and context.tricks_remaining >= _EARLY_GAME_TRICKS
+    ):
+        # As the active team we likely hold the trump majority - lead
+        # trumps early ("Trumpf ziehen") to draw out the opponents' trumps
+        # while we're still strong. Later in the game the other rules
+        # below take over.
+        return max(trump_legal, key=cpc.get_card_power)
 
     non_trump_legal = [card for card in legal_cards if card not in trumps]
     if non_trump_legal:
