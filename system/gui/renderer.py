@@ -51,6 +51,8 @@ _YES_NO_PROMPTS: dict[YesNoKind, Callable[[str], str]] = {
     YesNoKind.SHOOT_BACK: prompt_ask_player_shoots_back,
 }
 
+_CHOICE_ANNOUNCEMENT_DELAY = 1.6
+
 
 class GUIRenderer(Renderer):
     """Renders the table with pygame and collects input from the human player."""
@@ -189,18 +191,25 @@ class GUIRenderer(Renderer):
             self.state.message = ""
 
     def render_want_to_play_decision(self, player: Player, wants_to_play: bool) -> None:
-        self.render(
+        self._announce_choice(
             tell_player_wants_to_play(
                 player_name=player.player_name, wants_to_play=wants_to_play
             )
         )
 
     def render_game_mode_decision(self, player: Player, game_mode: type[Game] | None) -> None:
-        self.render(
+        self._announce_choice(
             tell_player_chose_game_mode(
                 player_name=player.player_name, game_mode=game_mode
             )
         )
+
+    def _announce_choice(self, message: str) -> None:
+        with self.lock:
+            self.state.choice_announcement = message
+        time.sleep(_CHOICE_ANNOUNCEMENT_DELAY)
+        with self.lock:
+            self.state.choice_announcement = None
 
     # ------------------------------------------------------------------
     # Renderer interface - ask_* (called from the game thread, blocking)
@@ -374,6 +383,8 @@ class GUIRenderer(Renderer):
             self._draw_center()
             self._draw_game_mode_badge()
 
+            if self.state.choice_announcement:
+                self._draw_choice_announcement()
             if self.state.message:
                 self._draw_message()
             if self.state.game_result is not None:
@@ -470,6 +481,17 @@ class GUIRenderer(Renderer):
         bg = pygame.Surface(rect.inflate(20, 12).size, pygame.SRCALPHA)
         bg.fill((0, 0, 0, 140))
         self.screen.blit(bg, rect.inflate(20, 12).topleft)
+        self.screen.blit(surf, rect)
+
+    def _draw_choice_announcement(self) -> None:
+        text = self.state.choice_announcement
+        assert text is not None
+        surf = self.fonts.announcement.render(text, True, c.TEXT_LIGHT)
+        rect = surf.get_rect(center=(c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2))
+        bg_rect = rect.inflate(60, 36)
+        bg = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+        bg.fill((0, 0, 0, 170))
+        self.screen.blit(bg, bg_rect.topleft)
         self.screen.blit(surf, rect)
 
     def _draw_message(self) -> None:

@@ -101,6 +101,7 @@ class Fonts:
     """Holds the fonts used by the GUI. Must be created after pygame.font.init()."""
 
     def __init__(self) -> None:
+        self.announcement = pygame.font.SysFont("arial", 46, bold=True)
         self.title = pygame.font.SysFont("arial", 34, bold=True)
         self.heading = pygame.font.SysFont("arial", 24, bold=True)
         self.body = pygame.font.SysFont("arial", 20)

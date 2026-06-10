@@ -49,6 +49,7 @@ class TableState:
     current_game_mode: str | None = None
     current_game_mode_chooser_seat: int | None = None
     current_game_mode_detail: str | None = None
+    choice_announcement: str | None = None
     message: str = ""
     game_result: GameResult | None = None
     pending: PendingRequest | None = None
