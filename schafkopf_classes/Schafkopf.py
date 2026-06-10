@@ -154,6 +154,9 @@ class Schafkopf:
                     decision: type[Game] | None = player.choose_game_mode(
                         prev_game_mode=game_mode,
                     )
+                    self.renderer.render_game_mode_decision(
+                        player=player, game_mode=decision
+                    )
                     game_mode = decision
                     game_chooser = player
 
@@ -165,6 +168,9 @@ class Schafkopf:
                         prev_game_mode=game_mode,
                         quitting_possible=True,
                     )
+                    self.renderer.render_game_mode_decision(
+                        player=player, game_mode=decision
+                    )
                     if decision is None:
                         continue
                     else:
@@ -175,6 +181,9 @@ class Schafkopf:
                     decision = player.choose_game_mode(
                         prev_game_mode=game_mode,
                         quitting_possible=True,
+                    )
+                    self.renderer.render_game_mode_decision(
+                        player=player, game_mode=decision
                     )
                     if decision is not None:
                         game_mode = decision
@@ -204,7 +213,11 @@ class Schafkopf:
             self.renderer.render_game_mode(game_mode_name=None, chooser=None)
             for player in self.players:
                 self.renderer.render_hand(player=player, cards=player.player_cards)
-                if player.ask_want_choose_game():
+                wants_to_play = player.ask_want_choose_game()
+                self.renderer.render_want_to_play_decision(
+                    player=player, wants_to_play=wants_to_play
+                )
+                if wants_to_play:
                     self.game_choosers.append(player)
             game: Game | None = self.players_choose_game()
             if game is not None:

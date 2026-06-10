@@ -31,6 +31,8 @@ from system.text import (
     prompt_ask_player_shoots_back,
     prompt_ask_to_choose_game,
     prompt_ask_to_double_game_value,
+    tell_player_chose_game_mode,
+    tell_player_wants_to_play,
 )
 
 if TYPE_CHECKING:
@@ -185,6 +187,20 @@ class GUIRenderer(Renderer):
             self.state.center_cards.clear()
             self.state.trick_winner_seat = None
             self.state.message = ""
+
+    def render_want_to_play_decision(self, player: Player, wants_to_play: bool) -> None:
+        self.render(
+            tell_player_wants_to_play(
+                player_name=player.player_name, wants_to_play=wants_to_play
+            )
+        )
+
+    def render_game_mode_decision(self, player: Player, game_mode: type[Game] | None) -> None:
+        self.render(
+            tell_player_chose_game_mode(
+                player_name=player.player_name, game_mode=game_mode
+            )
+        )
 
     # ------------------------------------------------------------------
     # Renderer interface - ask_* (called from the game thread, blocking)

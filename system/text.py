@@ -77,6 +77,20 @@ def tell_chosen_game_mode(
     return f"\n{message}."
 
 
+def tell_player_wants_to_play(player_name: str, wants_to_play: bool) -> str:
+    if wants_to_play:
+        return f"{player_name} wants to play."
+    else:
+        return f"{player_name} does not want to play."
+
+
+def tell_player_chose_game_mode(player_name: str, game_mode: type[Game] | None) -> str:
+    if game_mode is None:
+        return f"{player_name} passes."
+    else:
+        return f"{player_name} chooses {game_mode.name}."
+
+
 no_game_phrase = "\nNo game was selected."
 
 words_of_thanks = "\nThank you for playing!"
