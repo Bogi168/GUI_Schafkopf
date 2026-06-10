@@ -107,6 +107,5 @@ class Fonts:
         self.body = pygame.font.SysFont("arial", 20)
         self.small = pygame.font.SysFont("arial", 15)
         self.card_type = pygame.font.SysFont("arial", 18, bold=True)
-        self.card_color = pygame.font.SysFont("arial", 13)
         self.button = pygame.font.SysFont("arial", 19, bold=True)
         self.name = pygame.font.SysFont("arial", 19, bold=True)

@@ -97,6 +97,7 @@ class Renderer(ABC):
         game_mode_name: str | None,
         chooser: Player | None,
         detail: str | None = None,
+        detail_color: Color | None = None,
     ) -> None:
         pass
 
@@ -198,6 +199,7 @@ class ConsoleRenderer(Renderer):
         game_mode_name: str | None,
         chooser: Player | None,
         detail: str | None = None,
+        detail_color: Color | None = None,
     ) -> None:
         if game_mode_name is not None:
             print(

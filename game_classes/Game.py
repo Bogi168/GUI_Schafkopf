@@ -141,6 +141,12 @@ class Game(ABC):
 
         return None
 
+    def display_detail_color(self) -> Color | None:
+        """The Color (if any) named in display_detail(), so the GUI can show
+        a suit symbol instead of the color name."""
+
+        return None
+
     def sort_player_hands(self) -> None:
         """
         Sorts the cards of the players according to their power in the game.

@@ -103,6 +103,9 @@ class Solo(Game):
         assert self.trump_color is not None
         return f"{self.trump_color.display_name} trump"
 
+    def display_detail_color(self) -> Color | None:
+        return self.trump_color
+
     def create_game_value_calculator(
         self, winners: list[Player]
     ) -> GameValueCalculator:

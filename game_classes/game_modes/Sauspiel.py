@@ -116,6 +116,9 @@ class Sauspiel(Game):
     def display_detail(self) -> str | None:
         return f"{self.call_sau.card_color.display_name} Sau"
 
+    def display_detail_color(self) -> Color | None:
+        return self.call_sau.card_color
+
     def create_game_value_calculator(
         self, winners: list[Player]
     ) -> GameValueCalculator:

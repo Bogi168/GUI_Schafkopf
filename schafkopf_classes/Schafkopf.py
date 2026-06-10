@@ -226,6 +226,7 @@ class Schafkopf:
                     game_mode_name=game.name,
                     chooser=getattr(game, "game_chooser", None),
                     detail=game.display_detail(),
+                    detail_color=game.display_detail_color(),
                 )
                 game.play_game()
             else:

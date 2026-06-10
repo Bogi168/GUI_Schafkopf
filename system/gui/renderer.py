@@ -23,6 +23,7 @@ from system.Renderer import ColorChoiceKind, Renderer, YesNoKind
 from system.gui import constants as c
 from system.gui.cards import draw_card_back, draw_card_face
 from system.gui.state import PendingRequest, PlayedCardEntry, TableState
+from system.gui.suit_images import get_suit_image
 from system.gui.widgets import Button, TextInput
 from system.text import (
     prompt_ask_for_hochzeit,
@@ -176,12 +177,14 @@ class GUIRenderer(Renderer):
         game_mode_name: str | None,
         chooser: Player | None,
         detail: str | None = None,
+        detail_color: Color | None = None,
     ) -> None:
         seat = self._ensure_seat(chooser) if chooser is not None else None
         with self.lock:
             self.state.current_game_mode = game_mode_name
             self.state.current_game_mode_chooser_seat = seat
             self.state.current_game_mode_detail = detail
+            self.state.current_game_mode_detail_color = detail_color
 
     def render_game_result(self, result: GameResult) -> None:
         with self.lock:
@@ -473,15 +476,35 @@ class GUIRenderer(Renderer):
             text = game_mode
 
         detail = self.state.current_game_mode_detail
-        if detail is not None:
-            text += f" ({detail})"
+        detail_color = self.state.current_game_mode_detail_color
 
-        surf = self.fonts.body.render(text, True, c.TEXT_LIGHT)
-        rect = surf.get_rect(topleft=(36, 36))
+        suffix = None
+        if detail is not None and detail_color is not None:
+            color_name = detail_color.display_name
+            if detail.startswith(color_name):
+                suffix = detail[len(color_name):].strip()
+
+        if detail is not None and suffix is None:
+            text += f" ({detail})"
+            detail_color = None
+
+        pieces: list[pygame.Surface] = [self.fonts.body.render(text, True, c.TEXT_LIGHT)]
+        if detail_color is not None:
+            pieces.append(self.fonts.body.render(" (", True, c.TEXT_LIGHT))
+            pieces.append(get_suit_image(detail_color, height=20))
+            pieces.append(self.fonts.body.render(f" {suffix})", True, c.TEXT_LIGHT))
+
+        total_width = sum(piece.get_width() for piece in pieces)
+        height = max(piece.get_height() for piece in pieces)
+        rect = pygame.Rect(36, 36, total_width, height)
         bg = pygame.Surface(rect.inflate(20, 12).size, pygame.SRCALPHA)
         bg.fill((0, 0, 0, 140))
         self.screen.blit(bg, rect.inflate(20, 12).topleft)
-        self.screen.blit(surf, rect)
+
+        x = rect.x
+        for piece in pieces:
+            self.screen.blit(piece, (x, rect.centery - piece.get_height() // 2))
+            x += piece.get_width()
 
     def _draw_choice_announcement(self) -> None:
         text = self.state.choice_announcement
@@ -567,13 +590,9 @@ class GUIRenderer(Renderer):
             col = index % cols
             row = index // cols
             rect = pygame.Rect(start_x + col * (btn_w + gap), y + row * (btn_h + gap), btn_w, btn_h)
-            button = Button(rect=rect, label=label, value=value)
+            image = get_suit_image(value, height=btn_h - 16) if pending.kind == "color" else None
+            button = Button(rect=rect, label=label, value=value, image=image)
             button.draw(self.screen, self.fonts, mouse_pos)
-            if pending.kind == "color":
-                swatch = c.SUIT_COLORS.get(value)
-                if swatch is not None:
-                    swatch_rect = pygame.Rect(rect.x + 8, rect.y + 8, 14, rect.height - 16)
-                    pygame.draw.rect(self.screen, swatch, swatch_rect, border_radius=3)
             self._current_buttons.append(button)
 
     def _draw_player_name_panel(self) -> None:

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from card_classes.Cards import Card
+    from card_classes.Cards import Card, Color
     from player_classes.Player import Player
     from system.Renderer import GameResult
 
@@ -49,6 +49,7 @@ class TableState:
     current_game_mode: str | None = None
     current_game_mode_chooser_seat: int | None = None
     current_game_mode_detail: str | None = None
+    current_game_mode_detail_color: Color | None = None
     choice_announcement: str | None = None
     message: str = ""
     game_result: GameResult | None = None

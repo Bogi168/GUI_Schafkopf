@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from system.gui import constants as c
+from system.gui.suit_images import get_suit_image
 
 if TYPE_CHECKING:
     from card_classes.Cards import Card
@@ -32,10 +33,10 @@ def draw_card_face(
     text_color = c.TEXT_DIM if dim else c.TEXT_DARK
 
     type_surf = fonts.card_type.render(card.card_type.display_name, True, text_color)
-    color_surf = fonts.card_color.render(card.card_color.display_name, True, text_color)
-
     surface.blit(type_surf, type_surf.get_rect(center=(rect.centerx, rect.centery - 6)))
-    surface.blit(color_surf, color_surf.get_rect(center=(rect.centerx, rect.centery + 20)))
+
+    symbol = get_suit_image(card.card_color, height=24, dim=dim)
+    surface.blit(symbol, symbol.get_rect(center=(rect.centerx, rect.centery + 22)))
 
 
 def draw_card_back(surface: pygame.Surface, rect: pygame.Rect) -> None:
