@@ -180,14 +180,13 @@ class Schafkopf:
                 else:
                     decision = player.choose_game_mode(
                         prev_game_mode=game_mode,
-                        quitting_possible=True,
+                        quitting_possible=False,
                     )
                     self.renderer.render_game_mode_decision(
                         player=player, game_mode=decision
                     )
-                    if decision is not None:
-                        game_mode = decision
-                        game_chooser = player
+                    game_mode = decision
+                    game_chooser = player
 
                 if game_mode is SoloTout:
                     break
