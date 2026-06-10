@@ -31,6 +31,10 @@ python3 -m pytest tests/test_card_decision_validator.py
 python3 -m pytest tests/test_card_decision_validator.py::test_name
 ```
 
+## Testing
+
+Any new behavior must be covered by tests, and the full suite (`python3 -m pytest tests/`) must pass before considering a change done — do not leave existing tests broken.
+
 ## Git workflow
 
 After completing any meaningful unit of work — a bug fix, a new feature, a refactor — commit the changes and push to GitHub immediately. This ensures there is always a recoverable state on the remote.
