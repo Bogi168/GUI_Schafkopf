@@ -328,16 +328,63 @@ def test_bot_ask_for_ramsch_delegates_to_wants_to_play_ramsch(
 
 
 def test_wants_to_shoot_true_with_majority_of_trumps(sauspiel_trumps):
-    # All 4 Ober + all 4 Unter = 8 of the 14 Sauspiel trumps - more than
-    # any other single player can hold.
+    # All 4 Ober + all 4 Unter = 8 of the 14 Sauspiel trumps - far above the
+    # "6 trumps with some higher Obers" bar.
     hand = sauspiel_trumps[:8]
 
     assert wants_to_shoot(hand, sauspiel_trumps) is True
 
 
-def test_wants_to_shoot_false_with_only_half_of_trumps(sauspiel_trumps, eichel_sau):
-    # 7 of the 14 trumps - exactly half is not a guaranteed majority.
-    hand = sauspiel_trumps[:7] + [eichel_sau]
+def test_wants_to_shoot_true_at_normal_threshold(
+    eichel_ober,
+    gruen_ober,
+    herz_sau,
+    herz_ten,
+    herz_koenig,
+    herz_nine,
+    eichel_seven,
+    gruen_seven,
+    sauspiel_trumps,
+):
+    # 2 Ober (6.0) + 4 Herz trumps (4.0) = 10.0 - exactly "6 trumps with
+    # some of the higher Obers".
+    hand = [
+        eichel_ober,
+        gruen_ober,
+        herz_sau,
+        herz_ten,
+        herz_koenig,
+        herz_nine,
+        eichel_seven,
+        gruen_seven,
+    ]
+
+    assert wants_to_shoot(hand, sauspiel_trumps) is True
+
+
+def test_wants_to_shoot_false_below_normal_threshold(
+    eichel_ober,
+    eichel_unter,
+    herz_sau,
+    herz_ten,
+    herz_koenig,
+    herz_nine,
+    eichel_seven,
+    gruen_seven,
+    sauspiel_trumps,
+):
+    # 1 Ober (3.0) + 1 Unter (2.0) + 4 Herz trumps (4.0) = 9.0 - just below
+    # the threshold.
+    hand = [
+        eichel_ober,
+        eichel_unter,
+        herz_sau,
+        herz_ten,
+        herz_koenig,
+        herz_nine,
+        eichel_seven,
+        gruen_seven,
+    ]
 
     assert wants_to_shoot(hand, sauspiel_trumps) is False
 
@@ -394,16 +441,153 @@ def test_wants_to_shoot_false_with_half_of_wenz_trumps(
     assert wants_to_shoot(hand, wenz_trumps) is False
 
 
-def test_wants_to_shoot_false_without_trumps_information(sauspiel_trumps):
-    # Ramsch passes no trumps - shooting never applies there.
+def test_wants_to_shoot_false_without_trumps(sauspiel_trumps):
+    # An empty trumps list means the game mode is unknown - shooting
+    # cannot be judged without it.
     hand = sauspiel_trumps[:8]
 
     assert wants_to_shoot(hand, []) is False
 
 
-def test_bot_ask_shoot_delegates_to_wants_to_shoot(sauspiel_trumps, eichel_sau):
-    strong_hand = sauspiel_trumps[:8]
-    weak_hand = sauspiel_trumps[:7] + [eichel_sau]
+def test_wants_to_shoot_ramsch_true_for_low_risk_hand(
+    eichel_seven,
+    eichel_eight,
+    eichel_nine,
+    eichel_koenig,
+    gruen_seven,
+    gruen_eight,
+    schellen_seven,
+    schellen_eight,
+):
+    hand = [
+        eichel_seven,
+        eichel_eight,
+        eichel_nine,
+        eichel_koenig,
+        gruen_seven,
+        gruen_eight,
+        schellen_seven,
+        schellen_eight,
+    ]
+
+    assert wants_to_shoot(hand, [], is_ramsch=True) is True
+
+
+def test_wants_to_shoot_ramsch_false_for_trump_heavy_hand(
+    eichel_ober,
+    gruen_ober,
+    herz_ober,
+    schellen_ober,
+    eichel_unter,
+    gruen_unter,
+    herz_sau,
+    herz_koenig,
+):
+    hand = [
+        eichel_ober,
+        gruen_ober,
+        herz_ober,
+        schellen_ober,
+        eichel_unter,
+        gruen_unter,
+        herz_sau,
+        herz_koenig,
+    ]
+
+    assert wants_to_shoot(hand, [], is_ramsch=True) is False
+
+
+def test_wants_to_shoot_tout_false_when_higher_trumps_can_block_every_trick(
+    herz_ober, schellen_ober, sauspiel_trumps
+):
+    # Herz Ober and Schellen Ober rank below Eichel Ober and Gruen Ober - if
+    # the game chooser plays those two Ober in the first two rounds, neither
+    # held trump can ever win a trick.
+    hand = [herz_ober, schellen_ober]
+
+    assert wants_to_shoot(hand, sauspiel_trumps, is_tout=True) is False
+
+
+def test_wants_to_shoot_tout_true_with_an_extra_trump_to_outlast_higher_ones(
+    herz_ober, schellen_ober, eichel_unter, sauspiel_trumps
+):
+    # The chooser can only play Eichel Ober and Gruen Ober once each - in
+    # one of those two rounds this hand can play its third trump and keep
+    # an Ober for a guaranteed trick win.
+    hand = [herz_ober, schellen_ober, eichel_unter]
+
+    assert wants_to_shoot(hand, sauspiel_trumps, is_tout=True) is True
+
+
+def test_wants_to_shoot_tout_false_without_any_trumps_held(eichel_sau, sauspiel_trumps):
+    hand = [eichel_sau]
+
+    assert wants_to_shoot(hand, sauspiel_trumps, is_tout=True) is False
+
+
+def test_wants_to_shoot_wenz_tout_true_holding_strongest_unter_alone(
+    eichel_unter, wenz_trumps
+):
+    # Eichel Unter is the strongest of the 4 trumps - no other trump can
+    # ever beat it.
+    hand = [eichel_unter]
+
+    assert wants_to_shoot(hand, wenz_trumps, is_tout=True) is True
+
+
+def test_wants_to_shoot_wenz_tout_false_holding_only_lower_trumps(
+    herz_unter, schellen_unter, wenz_trumps
+):
+    # Herz Unter and Schellen Unter rank below Eichel Unter and Gruen Unter -
+    # if the game chooser plays those two first, neither held trump can ever
+    # win a trick.
+    hand = [herz_unter, schellen_unter]
+
+    assert wants_to_shoot(hand, wenz_trumps, is_tout=True) is False
+
+
+def test_wants_to_shoot_wenz_tout_true_with_three_lower_trumps(
+    gruen_unter, herz_unter, schellen_unter, wenz_trumps
+):
+    # Holding 3 of the 4 trumps guarantees a trick even if the chooser
+    # holds the strongest one.
+    hand = [gruen_unter, herz_unter, schellen_unter]
+
+    assert wants_to_shoot(hand, wenz_trumps, is_tout=True) is True
+
+
+def test_bot_ask_shoot_delegates_to_wants_to_shoot(
+    eichel_ober,
+    gruen_ober,
+    eichel_unter,
+    herz_sau,
+    herz_ten,
+    herz_koenig,
+    herz_nine,
+    eichel_seven,
+    gruen_seven,
+    sauspiel_trumps,
+):
+    strong_hand = [
+        eichel_ober,
+        gruen_ober,
+        herz_sau,
+        herz_ten,
+        herz_koenig,
+        herz_nine,
+        eichel_seven,
+        gruen_seven,
+    ]
+    weak_hand = [
+        eichel_ober,
+        eichel_unter,
+        herz_sau,
+        herz_ten,
+        herz_koenig,
+        herz_nine,
+        eichel_seven,
+        gruen_seven,
+    ]
 
     assert _bot(strong_hand).ask_shoot(trumps=sauspiel_trumps) is True
     assert _bot(weak_hand).ask_shoot(trumps=sauspiel_trumps) is False
@@ -411,3 +595,37 @@ def test_bot_ask_shoot_delegates_to_wants_to_shoot(sauspiel_trumps, eichel_sau):
 
 def test_bot_ask_shoot_without_trumps_defaults_to_false(sauspiel_trumps):
     assert _bot(sauspiel_trumps[:8]).ask_shoot() is False
+
+
+def test_bot_ask_shoot_tout_delegates_to_can_guarantee_a_trick(
+    herz_ober, schellen_ober, eichel_unter, sauspiel_trumps
+):
+    no_extra_trump = _bot([herz_ober, schellen_ober])
+    with_extra_trump = _bot([herz_ober, schellen_ober, eichel_unter])
+
+    assert no_extra_trump.ask_shoot(trumps=sauspiel_trumps, is_tout=True) is False
+    assert with_extra_trump.ask_shoot(trumps=sauspiel_trumps, is_tout=True) is True
+
+
+def test_bot_ask_shoot_ramsch_delegates_to_wants_to_play_ramsch(
+    eichel_seven,
+    eichel_eight,
+    eichel_nine,
+    eichel_koenig,
+    gruen_seven,
+    gruen_eight,
+    schellen_seven,
+    schellen_eight,
+):
+    safe_hand = [
+        eichel_seven,
+        eichel_eight,
+        eichel_nine,
+        eichel_koenig,
+        gruen_seven,
+        gruen_eight,
+        schellen_seven,
+        schellen_eight,
+    ]
+
+    assert _bot(safe_hand).ask_shoot(is_ramsch=True) is True

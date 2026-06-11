@@ -146,6 +146,33 @@ def test_render_double_game_value_decision_silent_when_not_doubling(renderer, pl
     assert calls == []
 
 
+def test_render_shoot_decision_announces_when_shooting(renderer, player_2):
+    calls = []
+    renderer._announce_choice = lambda *args, **kwargs: calls.append((args, kwargs))
+
+    renderer.render_shoot_decision(player=player_2, shoots=True)
+
+    assert calls == [(("Testplayer 2 shoots!",), {})]
+
+
+def test_render_shoot_decision_announces_when_shooting_back(renderer, player_2):
+    calls = []
+    renderer._announce_choice = lambda *args, **kwargs: calls.append((args, kwargs))
+
+    renderer.render_shoot_decision(player=player_2, shoots=True, is_shoot_back=True)
+
+    assert calls == [(("Testplayer 2 shoots back!",), {})]
+
+
+def test_render_shoot_decision_silent_when_not_shooting(renderer, player_2):
+    calls = []
+    renderer._announce_choice = lambda *args, **kwargs: calls.append((args, kwargs))
+
+    renderer.render_shoot_decision(player=player_2, shoots=False)
+
+    assert calls == []
+
+
 def test_render_game_mode_with_game_hides_lamps(renderer):
     renderer.render_game_mode(game_mode_name=None, chooser=None)
 

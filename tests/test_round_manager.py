@@ -117,7 +117,9 @@ def test_handle_shooting_shot_without_shoot_back_flips_active_team(
     assert round_manager.amt_game_val_doubles == 1
     assert round_manager.active_team == team_two_players_2
     for prev_active_player in team_two_players_1.players:
-        prev_active_player.ask_shoot.assert_called_once_with(ask_shoot_back=True, trumps=[])
+        prev_active_player.ask_shoot.assert_called_once_with(
+            ask_shoot_back=True, trumps=[], is_tout=False, is_ramsch=False
+        )
 
 
 def test_handle_shooting_shoot_back_keeps_active_team_and_doubles_again(
@@ -146,7 +148,9 @@ def test_handle_shooting_shoot_back_keeps_active_team_and_doubles_again(
     assert round_manager.amt_game_val_doubles == 2
     assert round_manager.active_team == team_two_players_1
     # only the first active-team player who shoots back is asked
-    shoot_back_player.ask_shoot.assert_called_once_with(ask_shoot_back=True, trumps=[])
+    shoot_back_player.ask_shoot.assert_called_once_with(
+        ask_shoot_back=True, trumps=[], is_tout=False, is_ramsch=False
+    )
     other_active_player.ask_shoot.assert_not_called()
 
 
@@ -478,7 +482,9 @@ def test_play_round_first_round_no_shots_keeps_active_team(
         player.ask_shoot.assert_not_called()
     # everyone else is asked once, since nobody shoots
     for player in team_two_players_2.players:
-        player.ask_shoot.assert_called_once_with(trumps=sauspiel_trumps)
+        player.ask_shoot.assert_called_once_with(
+            trumps=sauspiel_trumps, is_tout=False, is_ramsch=False
+        )
     assert round_manager.amt_game_val_doubles == 0
     assert round_manager.active_team == team_two_players_1
     assert round_manager.played_cards == [
@@ -539,9 +545,15 @@ def test_play_round_shooting_stops_after_first_shot(
     round_manager.play_round(is_first_round=True)
 
     # active team players are only consulted for the shoot-back
-    active_1.ask_shoot.assert_called_once_with(ask_shoot_back=True, trumps=sauspiel_trumps)
-    active_2.ask_shoot.assert_called_once_with(ask_shoot_back=True, trumps=sauspiel_trumps)
-    shooter.ask_shoot.assert_called_once_with(trumps=sauspiel_trumps)
+    active_1.ask_shoot.assert_called_once_with(
+        ask_shoot_back=True, trumps=sauspiel_trumps, is_tout=False, is_ramsch=False
+    )
+    active_2.ask_shoot.assert_called_once_with(
+        ask_shoot_back=True, trumps=sauspiel_trumps, is_tout=False, is_ramsch=False
+    )
+    shooter.ask_shoot.assert_called_once_with(
+        trumps=sauspiel_trumps, is_tout=False, is_ramsch=False
+    )
     # shooting is settled after the first shot -> last_player is never asked
     last_player.ask_shoot.assert_not_called()
 
@@ -611,6 +623,6 @@ def test_ramsch_play_round_asks_every_player_to_shoot(
     round_manager.play_round(is_first_round=True)
 
     for player in players:
-        player.ask_shoot.assert_called_once_with()
+        player.ask_shoot.assert_called_once_with(is_ramsch=True)
     assert round_manager.active_players == players
     assert round_manager.amt_game_val_doubles == 4

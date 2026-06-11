@@ -168,7 +168,13 @@ class Player:
 
         return self.renderer.ask_yes_no(player=self, kind=YesNoKind.RAMSCH)
 
-    def ask_shoot(self, ask_shoot_back: bool = False, trumps: list[Card] | None = None) -> bool:
+    def ask_shoot(
+        self,
+        ask_shoot_back: bool = False,
+        trumps: list[Card] | None = None,
+        is_tout: bool = False,
+        is_ramsch: bool = False,
+    ) -> bool:
         """
         Asks the player whether he wants to shoot or not.
         By shooting, the player doubles the game value and his team turns to the active team.
@@ -177,6 +183,12 @@ class Player:
         :param trumps: The trumps of the current game mode, used by Bots to judge their hand.
             Ignored by human players.
         :type trumps: list[Card] | None
+        :param is_tout: Whether the current game mode is a Tout, used by Bots to judge their
+            hand. Ignored by human players.
+        :type is_tout: bool
+        :param is_ramsch: Whether the current round is a Ramsch, used by Bots to judge their
+            hand. Ignored by human players.
+        :type is_ramsch: bool
         :return: A boolean indicating whether the player wants to shoot or not
         :rtype: bool
         """
@@ -311,5 +323,16 @@ class Bot(Player):
         self.player_cards.remove(decision)
         return decision
 
-    def ask_shoot(self, ask_shoot_back: bool = False, trumps: list[Card] | None = None) -> bool:
-        return wants_to_shoot(player_cards=self.player_cards, trumps=trumps or [])
+    def ask_shoot(
+        self,
+        ask_shoot_back: bool = False,
+        trumps: list[Card] | None = None,
+        is_tout: bool = False,
+        is_ramsch: bool = False,
+    ) -> bool:
+        return wants_to_shoot(
+            player_cards=self.player_cards,
+            trumps=trumps or [],
+            is_tout=is_tout,
+            is_ramsch=is_ramsch,
+        )

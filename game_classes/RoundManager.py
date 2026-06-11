@@ -65,10 +65,23 @@ class RoundManager:
     def handle_shooting(self, players_team: Team, player: Player) -> bool:
         if self.active_team is None or players_team == self.active_team:
             return True
-        if player.ask_shoot(trumps=self.trumps):
+        shoots = player.ask_shoot(
+            trumps=self.trumps, is_tout=self.is_tout, is_ramsch=self.is_ramsch
+        )
+        self.renderer.render_shoot_decision(player=player, shoots=shoots)
+        if shoots:
             self.amt_game_val_doubles += 1
             for prev_active_player in self.active_team.players:
-                if prev_active_player.ask_shoot(ask_shoot_back=True, trumps=self.trumps):
+                shoots_back = prev_active_player.ask_shoot(
+                    ask_shoot_back=True,
+                    trumps=self.trumps,
+                    is_tout=self.is_tout,
+                    is_ramsch=self.is_ramsch,
+                )
+                self.renderer.render_shoot_decision(
+                    player=prev_active_player, shoots=shoots_back, is_shoot_back=True
+                )
+                if shoots_back:
                     self.amt_game_val_doubles += 1
                     break
             else:
@@ -197,7 +210,9 @@ class RamschRoundManager(RoundManager):
         self.active_players: list[Player] = []
 
     def handle_shooting(self, players_team: Team, player: Player) -> bool:
-        if player.ask_shoot():
+        shoots = player.ask_shoot(is_ramsch=True)
+        self.renderer.render_shoot_decision(player=player, shoots=shoots)
+        if shoots:
             self.amt_game_val_doubles += 1
             self.active_players.append(player)
         shooting_possible: bool = True

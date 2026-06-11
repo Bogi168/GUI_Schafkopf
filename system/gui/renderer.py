@@ -37,6 +37,7 @@ from system.text import (
     prompt_ask_to_double_game_value,
     tell_player_chose_game_mode,
     tell_player_doubles_game_value,
+    tell_player_shoots,
     tell_player_wants_to_play,
 )
 
@@ -297,6 +298,16 @@ class GUIRenderer(Renderer):
         if doubles:
             self._announce_choice(
                 tell_player_doubles_game_value(player_name=player.player_name)
+            )
+
+    def render_shoot_decision(
+        self, player: Player, shoots: bool, is_shoot_back: bool = False
+    ) -> None:
+        if shoots:
+            self._announce_choice(
+                tell_player_shoots(
+                    player_name=player.player_name, is_shoot_back=is_shoot_back
+                )
             )
 
     def render_game_mode_decision(self, player: Player, game_mode: type[Game] | None) -> None:

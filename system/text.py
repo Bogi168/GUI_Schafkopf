@@ -88,6 +88,13 @@ def tell_player_doubles_game_value(player_name: str) -> str:
     return f"{player_name} doubles the game value!"
 
 
+def tell_player_shoots(player_name: str, is_shoot_back: bool = False) -> str:
+    if is_shoot_back:
+        return f"{player_name} shoots back!"
+    else:
+        return f"{player_name} shoots!"
+
+
 def tell_player_chose_game_mode(player_name: str, game_mode: type[Game] | None) -> str:
     if game_mode is None:
         return f"{player_name} passes."

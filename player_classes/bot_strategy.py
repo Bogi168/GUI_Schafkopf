@@ -38,6 +38,16 @@ _TOUT_THRESHOLD = 16.0
 # if the rest of the hand wouldn't otherwise reach _SOLO_THRESHOLD.
 _WENZ_MIN_UNTER = 3
 
+# Wenz/WenzTout: there are only 4 Unter trumps in total.
+_WENZ_TRUMP_COUNT = 4
+
+# Sauspiel/Hochzeit/Solo (non-Tout) shooting: a strict trump majority (8+ of
+# 14) is far too rare to be useful. "6 trumps including some of the higher
+# Obers" is already a clear edge - e.g. the 2 highest Obers
+# (2 * _OBER_STRENGTH = 6.0) plus 4 more trump-color cards
+# (4 * _TRUMP_HERZ_STRENGTH = 4.0) reach this threshold.
+_SHOOT_THRESHOLD_NORMAL = 10.0
+
 # Game mode ranks (see game_classes/game_modes/*.py): higher outranks lower.
 _SAUSPIEL_RANK = 2
 _HOCHZEIT_RANK = 3
@@ -203,26 +213,6 @@ def best_sau_color(player_cards: list[Card], options: dict[str, Color]) -> Color
     )
 
 
-def wants_to_shoot(player_cards: list[Card], trumps: list[Card]) -> bool:
-    """Decides whether a bot shoots (or shoots back), doubling the game
-    value and turning its own team into the active team for the rest of
-    the hand.
-
-    Shooting is a high-risk bet: it doubles the stakes for everyone, win
-    or lose, and the bot's hand alone has to be good enough to compensate
-    whatever team mate it ends up with. A bot only shoots if it holds a
-    strict majority of all trumps in this game mode - a guarantee that no
-    other player, including the game chooser, can hold more trumps than
-    it does. This is "incredibly good" and should happen very rarely.
-    """
-
-    if not trumps:
-        return False
-
-    trump_count = sum(1 for card in player_cards if card in trumps)
-    return trump_count > len(trumps) / 2
-
-
 def ramsch_risk(player_cards: list[Card]) -> float:
     """Estimates how likely a hand is to end up with the most points in a
     Ramsch.
@@ -267,3 +257,90 @@ def wants_to_play_ramsch(player_cards: list[Card]) -> bool:
     """
 
     return ramsch_risk(player_cards) <= _RAMSCH_RISK_THRESHOLD
+
+
+def trump_strength(player_cards: list[Card], trumps: list[Card]) -> float:
+    """Generalizes hand_strength to any trump suit.
+
+    ``trumps`` is the power-sorted list of all trumps in the current game
+    mode (see Game.__init__): positions 0-3 are the 4 Ober, 4-7 the 4
+    Unter, and the rest the trump-color cards. Weighting each held trump
+    by its position mirrors hand_strength's Ober/Unter/Herz-trump weights
+    for any trump color. A blanc Sau of a non-trump color still counts as
+    _SAU_STRENGTH, just like in hand_strength.
+    """
+
+    score = 0.0
+    for card in player_cards:
+        if card in trumps:
+            index = trumps.index(card)
+            if index < 4:
+                score += _OBER_STRENGTH
+            elif index < 8:
+                score += _UNTER_STRENGTH
+            else:
+                score += _TRUMP_HERZ_STRENGTH
+        elif card.card_type == Type.SAU:
+            score += _SAU_STRENGTH
+    return score
+
+
+def _can_guarantee_a_trick(player_cards: list[Card], trumps: list[Card]) -> bool:
+    """In a Tout, decides whether the player can force a trick win no
+    matter how the game chooser plays.
+
+    The game chooser can play one trump per round. Every trump ranked
+    above the player's strongest held trump can be used this way to "use
+    up" a round without the player ever getting to play their strongest
+    trump - so the player needs more held trumps than there are trumps
+    ranked above their strongest one to guarantee winning a trick once
+    those higher trumps are exhausted.
+    """
+
+    held_ranks = [rank for rank, trump in enumerate(trumps) if trump in player_cards]
+    if not held_ranks:
+        return False
+    return len(held_ranks) > min(held_ranks)
+
+
+def wants_to_shoot(
+    player_cards: list[Card],
+    trumps: list[Card],
+    is_tout: bool = False,
+    is_ramsch: bool = False,
+) -> bool:
+    """Decides whether a bot shoots (or shoots back), doubling the game
+    value and turning its own team into the active team for the rest of
+    the hand.
+
+    Shooting is a high-risk bet: it doubles the stakes for everyone, win
+    or lose. The bar for it depends on the game mode:
+
+    - Ramsch has no active team to challenge - shooting only signals that
+      this hand is safe enough that the bot would have volunteered for a
+      Ramsch itself (see wants_to_play_ramsch).
+    - In a Tout, the game chooser must win every trick, so a bot that can
+      force at least one trick win on its own (see _can_guarantee_a_trick)
+      guarantees the chooser loses and should always shoot.
+    - In Wenz, a strict majority of the 4 Unter (3 or more) means no other
+      player - including the chooser - can hold more, which is
+      "incredibly good" on its own.
+    - In Sauspiel/Hochzeit/Solo, a strict trump majority is far too rare to
+      be useful; instead a hand around "6 trumps including some of the
+      higher Obers" (see _SHOOT_THRESHOLD_NORMAL) is a clear enough edge.
+    """
+
+    if is_ramsch:
+        return wants_to_play_ramsch(player_cards)
+
+    if not trumps:
+        return False
+
+    if is_tout:
+        return _can_guarantee_a_trick(player_cards, trumps)
+
+    if len(trumps) <= _WENZ_TRUMP_COUNT:
+        trump_count = sum(1 for card in player_cards if card in trumps)
+        return trump_count > len(trumps) / 2
+
+    return trump_strength(player_cards, trumps) >= _SHOOT_THRESHOLD_NORMAL
