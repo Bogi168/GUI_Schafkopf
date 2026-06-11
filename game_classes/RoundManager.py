@@ -91,6 +91,7 @@ class RoundManager:
             call_sau=self.call_sau,
             trick_history=self.trick_history,
         )
+        team_sizes = {len(team.players) for team in self.player_teams.values()}
         return CardPlayContext(
             current_trick=self.current_trick,
             trumps=self.trumps,
@@ -100,6 +101,7 @@ class RoundManager:
             is_ramsch=self.is_ramsch,
             is_tout=self.is_tout,
             is_active_team=self.player_teams[player] is self.active_team,
+            is_solo_mode=team_sizes == {1, 3},
             call_sau=self.call_sau,
             tricks_remaining=len(player.player_cards),
             trick_history=list(self.trick_history),

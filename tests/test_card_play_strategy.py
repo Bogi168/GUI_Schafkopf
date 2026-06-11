@@ -30,6 +30,7 @@ def _context(
     is_ramsch=False,
     is_tout=False,
     is_active_team=False,
+    is_solo_mode=False,
     call_sau=None,
     tricks_remaining=8,
     trick_history=(),
@@ -45,6 +46,7 @@ def _context(
         is_ramsch=is_ramsch,
         is_tout=is_tout,
         is_active_team=is_active_team,
+        is_solo_mode=is_solo_mode,
         call_sau=call_sau,
         tricks_remaining=tricks_remaining,
         trick_history=[list(trick) for trick in trick_history],
@@ -210,6 +212,40 @@ def test_lead_active_team_trump_draw_only_applies_early_game(
 ):
     player = _FakePlayer(player_cards=[gruen_ober, eichel_sau])
     context = _context(trumps=sauspiel_trumps, is_active_team=True, tricks_remaining=2)
+
+    result = choose_card_to_play(player, [gruen_ober, eichel_sau], context)
+
+    assert result == eichel_sau
+
+
+def test_lead_solo_chooser_draws_trump_even_after_shoot_flips_active_team(
+    eichel_sau, gruen_ober, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[gruen_ober, eichel_sau])
+    context = _context(
+        trumps=sauspiel_trumps,
+        is_solo_mode=True,
+        teammates=[],
+        is_active_team=False,
+        tricks_remaining=8,
+    )
+
+    result = choose_card_to_play(player, [gruen_ober, eichel_sau], context)
+
+    assert result == gruen_ober
+
+
+def test_lead_solo_defender_does_not_draw_trump_even_after_shoot_flips_active_team(
+    eichel_sau, gruen_ober, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[gruen_ober, eichel_sau])
+    context = _context(
+        trumps=sauspiel_trumps,
+        is_solo_mode=True,
+        teammates=["teammate"],
+        is_active_team=True,
+        tricks_remaining=8,
+    )
 
     result = choose_card_to_play(player, [gruen_ober, eichel_sau], context)
 

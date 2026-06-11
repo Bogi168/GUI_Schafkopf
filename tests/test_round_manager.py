@@ -255,6 +255,54 @@ def test_play_card_context_includes_call_sau(
     assert context.call_sau == eichel_sau
 
 
+def test_play_card_context_marks_solo_mode_for_one_vs_three_teams(
+    team_alone_player_1, team_three_players_2_3_4, eichel_sau, eichel_ten, sauspiel_trumps
+):
+    bot = MagicMock()
+    bot.is_bot = True
+    bot.player_cards = [eichel_ten, eichel_sau]
+    bot.get_card_play_decision = MagicMock(return_value=eichel_ten)
+
+    round_manager = RoundManager(
+        players=[bot],
+        player_teams={bot: team_alone_player_1, "other": team_three_players_2_3_4},
+        trumps=sauspiel_trumps,
+        card_power_calculator=SauspielCardPowerCalculator(),
+        card_decision_validator=RegularTrumpTypeCardDecisionValidator(),
+        active_team=team_alone_player_1,
+        renderer=MagicMock(),
+    )
+
+    round_manager.play_card(player=bot)
+
+    context = bot.get_card_play_decision.call_args.kwargs["context"]
+    assert context.is_solo_mode is True
+
+
+def test_play_card_context_does_not_mark_solo_mode_for_two_vs_two_teams(
+    team_two_players_1, team_two_players_2, eichel_sau, eichel_ten, sauspiel_trumps
+):
+    bot = MagicMock()
+    bot.is_bot = True
+    bot.player_cards = [eichel_ten, eichel_sau]
+    bot.get_card_play_decision = MagicMock(return_value=eichel_ten)
+
+    round_manager = RoundManager(
+        players=[bot],
+        player_teams={bot: team_two_players_1, "other": team_two_players_2},
+        trumps=sauspiel_trumps,
+        card_power_calculator=SauspielCardPowerCalculator(),
+        card_decision_validator=RegularTrumpTypeCardDecisionValidator(),
+        active_team=team_two_players_1,
+        renderer=MagicMock(),
+    )
+
+    round_manager.play_card(player=bot)
+
+    context = bot.get_card_play_decision.call_args.kwargs["context"]
+    assert context.is_solo_mode is False
+
+
 # get_round_winner / reward_round_winner
 
 
