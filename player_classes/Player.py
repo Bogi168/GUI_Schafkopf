@@ -6,6 +6,7 @@ from player_classes.bot_strategy import (
     best_sau_color,
     best_trump_color,
     choose_preferred_game_mode,
+    wants_to_double_game_value,
     wants_to_play,
     wants_to_play_ramsch,
 )
@@ -244,7 +245,7 @@ class Bot(Player):
         return True
 
     def ask_double_game_value(self) -> bool:
-        return False
+        return wants_to_double_game_value(player_cards=self.player_cards)
 
     def ask_want_choose_game(self, players_who_want_to_play_count: int) -> bool:
         return wants_to_play(

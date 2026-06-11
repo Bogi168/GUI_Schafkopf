@@ -1,7 +1,11 @@
 from unittest.mock import MagicMock
 
 from player_classes.Player import Bot
-from player_classes.bot_strategy import ramsch_risk, wants_to_play_ramsch
+from player_classes.bot_strategy import (
+    ramsch_risk,
+    wants_to_double_game_value,
+    wants_to_play_ramsch,
+)
 
 
 def _bot(player_cards):
@@ -223,6 +227,60 @@ def test_wants_to_play_ramsch_false_when_blanc_sau_tips_a_trumpy_hand(
         schellen_sau,
     ]
     assert wants_to_play_ramsch(with_blanc_sau) is False
+
+
+def test_wants_to_double_game_value_true_for_very_strong_half_hand(
+    eichel_ober, gruen_ober, eichel_sau, gruen_sau
+):
+    # 2 Ober + 2 Sau = 9.0, well above the threshold - the doubling
+    # decision is made after seeing only these 4 cards.
+    half_hand = [eichel_ober, gruen_ober, eichel_sau, gruen_sau]
+
+    assert wants_to_double_game_value(half_hand) is True
+
+
+def test_wants_to_double_game_value_true_at_threshold(
+    eichel_unter, gruen_unter, herz_unter, schellen_unter
+):
+    # All 4 Unter = 8.0, exactly at the threshold.
+    half_hand = [eichel_unter, gruen_unter, herz_unter, schellen_unter]
+
+    assert wants_to_double_game_value(half_hand) is True
+
+
+def test_wants_to_double_game_value_false_for_decent_but_not_great_half_hand(
+    eichel_ober, eichel_unter, eichel_sau, eichel_koenig
+):
+    # 1 Ober + 1 Unter + 1 Sau + filler = 6.5 - a fine start, but not the
+    # "very very good" hand needed to risk doubling the stakes.
+    half_hand = [eichel_ober, eichel_unter, eichel_sau, eichel_koenig]
+
+    assert wants_to_double_game_value(half_hand) is False
+
+
+def test_wants_to_double_game_value_false_for_average_half_hand(
+    eichel_seven, eichel_eight, eichel_nine, eichel_koenig
+):
+    half_hand = [eichel_seven, eichel_eight, eichel_nine, eichel_koenig]
+
+    assert wants_to_double_game_value(half_hand) is False
+
+
+def test_bot_ask_double_game_value_delegates_to_wants_to_double_game_value(
+    eichel_ober,
+    gruen_ober,
+    eichel_sau,
+    gruen_sau,
+    eichel_seven,
+    eichel_eight,
+    eichel_nine,
+    eichel_koenig,
+):
+    strong_half_hand = [eichel_ober, gruen_ober, eichel_sau, gruen_sau]
+    weak_half_hand = [eichel_seven, eichel_eight, eichel_nine, eichel_koenig]
+
+    assert _bot(strong_half_hand).ask_double_game_value() is True
+    assert _bot(weak_half_hand).ask_double_game_value() is False
 
 
 def test_bot_ask_for_ramsch_delegates_to_wants_to_play_ramsch(

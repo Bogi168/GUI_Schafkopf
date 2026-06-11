@@ -22,6 +22,14 @@ _SAU_STRENGTH = 1.5
 # Sauspiel/Hochzeit material (see wants_to_play).
 _WANT_TO_PLAY_THRESHOLD = 8.0
 
+# Doubling the game value happens after seeing only the first half of the
+# hand (4 of 8 cards) and raises the stakes for everyone, win or lose, for
+# the entire hand. That is only worth the risk if those 4 cards alone are
+# already as strong as a full 8-card hand most bots would be happy to play
+# (see _WANT_TO_PLAY_THRESHOLD) - a rare sign that the completed hand will
+# be very good for a Sauspiel.
+_DOUBLE_GAME_VALUE_THRESHOLD = _WANT_TO_PLAY_THRESHOLD
+
 # Hand strength needed to choose/overbid into a Wenz/Solo or a Tout.
 _SOLO_THRESHOLD = 11.0
 _TOUT_THRESHOLD = 16.0
@@ -100,6 +108,19 @@ def wants_to_play(player_cards: list[Card], players_who_want_to_play_count: int)
         return False
 
     return strength >= _WANT_TO_PLAY_THRESHOLD
+
+
+def wants_to_double_game_value(player_cards: list[Card]) -> bool:
+    """Decides whether a bot doubles the game value after seeing the first
+    half of its hand.
+
+    Doubling raises the stakes for every player for the rest of the hand,
+    so it is only worth the risk when the cards seen so far already look
+    excellent on their own - strong enough to match a full hand the bot
+    would normally be happy to play (see _DOUBLE_GAME_VALUE_THRESHOLD).
+    """
+
+    return hand_strength(player_cards) >= _DOUBLE_GAME_VALUE_THRESHOLD
 
 
 def choose_preferred_game_mode(
