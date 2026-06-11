@@ -7,6 +7,7 @@ from player_classes.card_play_strategy import (
     CardPlayContext,
     _is_highest_remaining,
     _non_trump_suit_count,
+    _players_void_of_trumps,
     _remaining_unseen_cards,
     _safe_low_card,
     choose_card_to_play,
@@ -34,6 +35,7 @@ def _context(
     call_sau=None,
     tricks_remaining=8,
     trick_history=(),
+    known_trumpless=(),
 ):
     return CardPlayContext(
         current_trick=list(current_trick),
@@ -50,6 +52,7 @@ def _context(
         call_sau=call_sau,
         tricks_remaining=tricks_remaining,
         trick_history=[list(trick) for trick in trick_history],
+        known_trumpless=list(known_trumpless),
     )
 
 
@@ -564,10 +567,12 @@ def test_follow_holds_back_when_schmiering_is_risky(
     gruen_ober, herz_sau, gruen_seven, sauspiel_trumps
 ):
     player = _FakePlayer(player_cards=[herz_sau, gruen_seven])
+    # Both opponents still have to act and could hold a higher trump.
     context = _context(
         current_trick=[("teammate", gruen_ober)],
         trumps=sauspiel_trumps,
         teammates=["teammate"],
+        opponents=["opp1", "opp2"],
     )
 
     result = choose_card_to_play(player, [herz_sau, gruen_seven], context)
@@ -800,3 +805,149 @@ def test_follow_tout_does_not_waste_card_when_teammate_already_secured_trick(
     result = choose_card_to_play(player, [herz_sau, gruen_seven], context)
 
     assert result == gruen_seven
+
+
+# _players_void_of_trumps
+
+
+def test_players_void_of_trumps_combines_known_and_trumpfzwang(
+    herz_ober, herz_unter, schellen_seven, sauspiel_trumps
+):
+    # "defender" failed to follow a trump lead (Trumpfzwang), "chooser" is
+    # known trumpless from the start (Hochzeit swap); "follower" followed
+    # with a trump and proves nothing.
+    trick_history = [
+        [
+            ("leader", herz_ober),
+            ("defender", schellen_seven),
+            ("follower", herz_unter),
+        ]
+    ]
+    context = _context(
+        trumps=sauspiel_trumps,
+        trick_history=trick_history,
+        known_trumpless=("chooser",),
+    )
+
+    assert _players_void_of_trumps(context) == {"chooser", "defender"}
+
+
+def test_players_void_of_trumps_ignores_non_trump_leads(
+    eichel_ten, schellen_seven, sauspiel_trumps
+):
+    # Not following a non-trump lead proves nothing about trumps.
+    trick_history = [[("leader", eichel_ten), ("other", schellen_seven)]]
+    context = _context(trumps=sauspiel_trumps, trick_history=trick_history)
+
+    assert _players_void_of_trumps(context) == set()
+
+
+# Hochzeit: the chooser is publicly trumpless (known_trumpless)
+
+
+def test_follow_schmiers_when_only_trumpless_chooser_still_to_act(
+    eichel_sau, eichel_koenig, schellen_ten, schellen_seven, sauspiel_trumps
+):
+    # Hochzeit defender: my teammate's Eichel Sau is winning and the only
+    # player still to act is the chooser, who everyone knows holds no
+    # trumps - the trick cannot be lost, so feed it the Ten.
+    player = _FakePlayer(player_cards=[schellen_ten, schellen_seven])
+    context = _context(
+        current_trick=[("teammate", eichel_sau), ("partner", eichel_koenig)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["partner", "chooser"],
+        known_trumpless=("chooser",),
+    )
+
+    result = choose_card_to_play(player, [schellen_ten, schellen_seven], context)
+
+    assert result == schellen_ten
+
+
+def test_follow_holds_back_when_player_still_to_act_may_hold_trumps(
+    eichel_sau, eichel_koenig, schellen_ten, schellen_seven, sauspiel_trumps
+):
+    # Same trick, but without the trumpless knowledge the chooser could
+    # still trump the Sau away - don't feed points.
+    player = _FakePlayer(player_cards=[schellen_ten, schellen_seven])
+    context = _context(
+        current_trick=[("teammate", eichel_sau), ("partner", eichel_koenig)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["partner", "chooser"],
+    )
+
+    result = choose_card_to_play(player, [schellen_ten, schellen_seven], context)
+
+    assert result == schellen_seven
+
+
+def test_lead_cashes_sure_winner_when_all_threats_trumpless(
+    gruen_sau, gruen_seven, schellen_nine, herz_ober, eichel_koenig, sauspiel_trumps
+):
+    # Hochzeit defender: the chooser is publicly trumpless and the partner
+    # was proven void of trumps by Trumpfzwang - nothing can trump the
+    # Gruen Sau anymore, so cash it.
+    player = _FakePlayer(player_cards=[gruen_sau, gruen_seven, schellen_nine])
+    trick_history = [[("teammate", herz_ober), ("partner", eichel_koenig)]]
+    context = _context(
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["partner", "chooser"],
+        known_trumpless=("chooser",),
+        trick_history=trick_history,
+        tricks_remaining=3,
+    )
+
+    result = choose_card_to_play(
+        player, [gruen_sau, gruen_seven, schellen_nine], context
+    )
+
+    assert result == gruen_sau
+
+
+def test_lead_keeps_sau_back_when_a_threat_may_still_hold_trumps(
+    gruen_sau, gruen_seven, schellen_nine, sauspiel_trumps
+):
+    # Without proof that both opponents are out of trumps, the late-game
+    # Sau lead is too risky - fall back to a low card from the shortest
+    # suit.
+    player = _FakePlayer(player_cards=[gruen_sau, gruen_seven, schellen_nine])
+    context = _context(
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["partner", "chooser"],
+        known_trumpless=("chooser",),
+        tricks_remaining=3,
+    )
+
+    result = choose_card_to_play(
+        player, [gruen_sau, gruen_seven, schellen_nine], context
+    )
+
+    assert result == schellen_nine
+
+
+def test_lead_claims_trick_with_trump_when_threats_trumpless(
+    herz_ober, herz_seven, schellen_nine, gruen_ober, eichel_koenig, sauspiel_trumps
+):
+    # All threats proven trumpless: every trump is a sure winner, so claim
+    # the trick with the most valuable one instead of leading the losing
+    # Schellen Nine.
+    player = _FakePlayer(player_cards=[herz_ober, herz_seven, schellen_nine])
+    trick_history = [[("teammate", gruen_ober), ("partner", eichel_koenig)]]
+    context = _context(
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["partner", "chooser"],
+        known_trumpless=("chooser",),
+        trick_history=trick_history,
+        tricks_remaining=3,
+    )
+
+    result = choose_card_to_play(
+        player, [herz_ober, herz_seven, schellen_nine], context
+    )
+
+    assert result == herz_ober

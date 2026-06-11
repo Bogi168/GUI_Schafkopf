@@ -149,6 +149,19 @@ def test_hochzeit_gather_kwargs_without_partner_raises(schafkopf, player_1, monk
         Hochzeit.gather_kwargs(chooser=player_1, schafkopf=schafkopf)
 
 
+def test_hochzeit_round_manager_knows_chooser_is_trumpless(
+    schafkopf, player_1, player_2, monkeypatch
+):
+    monkeypatch.setattr(
+        schafkopf, "get_hochzeit_partner", lambda game_chooser: player_2
+    )
+    game = Hochzeit(**Hochzeit.gather_kwargs(chooser=player_1, schafkopf=schafkopf))
+
+    round_manager = game.create_round_manager()
+
+    assert round_manager.known_trumpless == [player_1]
+
+
 def test_ramsch_gather_kwargs(schafkopf):
     kwargs = Ramsch.gather_kwargs(chooser=None, schafkopf=schafkopf)
 

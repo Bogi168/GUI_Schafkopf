@@ -37,6 +37,7 @@ class RoundManager:
         self.is_tout: bool = is_tout
         self.game_chooser: Player | None = None
         self.call_sau: Card | None = None
+        self.known_trumpless: list[Player] = []
         self.played_cards: list[Card] = []
         self.trick_history: list[list[tuple[Player, Card]]] = []
         self.amt_game_val_doubles: int = 0
@@ -118,6 +119,7 @@ class RoundManager:
             call_sau=self.call_sau,
             tricks_remaining=len(player.player_cards),
             trick_history=list(self.trick_history),
+            known_trumpless=list(self.known_trumpless),
         )
 
     def play_card(self, player: Player) -> None:

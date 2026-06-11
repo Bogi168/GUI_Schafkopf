@@ -259,6 +259,31 @@ def test_play_card_context_includes_call_sau(
     assert context.call_sau == eichel_sau
 
 
+def test_play_card_context_includes_known_trumpless(
+    team_alone_player_1, eichel_sau, eichel_ten, sauspiel_trumps
+):
+    bot = MagicMock()
+    bot.is_bot = True
+    bot.player_cards = [eichel_ten, eichel_sau]
+    bot.get_card_play_decision = MagicMock(return_value=eichel_ten)
+
+    round_manager = RoundManager(
+        players=[bot],
+        player_teams={bot: team_alone_player_1},
+        trumps=sauspiel_trumps,
+        card_power_calculator=SauspielCardPowerCalculator(),
+        card_decision_validator=RegularTrumpTypeCardDecisionValidator(),
+        active_team=team_alone_player_1,
+        renderer=MagicMock(),
+    )
+    round_manager.known_trumpless = ["chooser"]
+
+    round_manager.play_card(player=bot)
+
+    context = bot.get_card_play_decision.call_args.kwargs["context"]
+    assert context.known_trumpless == ["chooser"]
+
+
 def test_play_card_context_marks_solo_mode_for_one_vs_three_teams(
     team_alone_player_1, team_three_players_2_3_4, eichel_sau, eichel_ten, sauspiel_trumps
 ):

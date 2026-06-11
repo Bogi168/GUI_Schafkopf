@@ -16,6 +16,7 @@ from system.custom_exceptions import GameNotPlayableError
 
 if TYPE_CHECKING:
     from card_classes.Cards import Cards, Card
+    from game_classes.RoundManager import RoundManager
     from system.Renderer import Renderer
     from player_classes.Player import Player
     from schafkopf_classes.Schafkopf import Schafkopf
@@ -98,6 +99,14 @@ class Hochzeit(Game):
     def create_teams(self) -> None:
         super().create_teams()
         self.hochzeit_card_swap()
+
+    def create_round_manager(self) -> RoundManager:
+        round_manager = super().create_round_manager()
+        # The chooser entered the Hochzeit with exactly one trump and handed
+        # it to the partner in the swap - everyone at the table knows they
+        # are out of trumps for the whole game.
+        round_manager.known_trumpless = [self.game_chooser]
+        return round_manager
 
     def create_game_value_calculator(
         self, winners: list[Player]
