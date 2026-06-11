@@ -7,6 +7,7 @@ from player_classes.bot_strategy import (
     best_trump_color,
     choose_preferred_game_mode,
     wants_to_play,
+    wants_to_play_ramsch,
 )
 from player_classes.card_play_strategy import choose_card_to_play
 import random
@@ -279,7 +280,7 @@ class Bot(Player):
         return False
 
     def ask_for_ramsch(self) -> bool:
-        return False
+        return wants_to_play_ramsch(player_cards=self.player_cards)
 
     def get_card_swap_decision(
         self,

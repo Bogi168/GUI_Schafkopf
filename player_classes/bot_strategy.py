@@ -38,6 +38,25 @@ _SOLO_RANK = 5
 _WENZ_TOUT_RANK = 6
 _SOLO_TOUT_RANK = 7
 
+# Ramsch risk weights: how much each card contributes to the danger of
+# ending up with the most points. Ober/Unter and Herz cards are trumps in
+# Ramsch and tend to win tricks, with Ober the most dangerous. A "blanc" Sau
+# or Ten - the only card of its color in hand - must be played whenever that
+# color is led and, being the strongest non-trump card of its suit, often
+# wins an unwanted trick.
+_RAMSCH_OBER_RISK = 2.5
+_RAMSCH_UNTER_RISK = 2.0
+_RAMSCH_HERZ_TRUMP_RISK = 1.0
+_RAMSCH_BLANC_SAU_RISK = 2.0
+_RAMSCH_BLANC_TEN_RISK = 1.0
+
+# Roughly the expected risk of a random 8-card hand (about one Ober, one
+# Unter and one and a half Herz trumps). A hand riskier than this is more
+# likely than not to rake in the most points, so the bot prefers to redraw.
+_RAMSCH_RISK_THRESHOLD = 7.0
+
+_NON_TRUMP_COLORS = (Color.EICHEL, Color.GRUEN, Color.SCHELLEN)
+
 
 def _unter_count(player_cards: list[Card]) -> int:
     return sum(1 for card in player_cards if card.card_type == Type.UNTER)
@@ -160,3 +179,49 @@ def best_sau_color(player_cards: list[Card], options: dict[str, Color]) -> Color
     return min(
         options.values(), key=lambda color: _non_trump_color_count(player_cards, color)
     )
+
+
+def ramsch_risk(player_cards: list[Card]) -> float:
+    """Estimates how likely a hand is to end up with the most points in a
+    Ramsch.
+
+    Trumps (Ober, Unter and Herz) raise the risk since they tend to win
+    tricks, with Ober the most dangerous. A "blanc" Sau or Ten - the only
+    card of its color in hand - also raises the risk, since it must be
+    played whenever that color is led and, being the strongest non-trump
+    card of its suit, often wins an unwanted trick.
+    """
+
+    risk = 0.0
+    for card in player_cards:
+        if card.card_type == Type.OBER:
+            risk += _RAMSCH_OBER_RISK
+        elif card.card_type == Type.UNTER:
+            risk += _RAMSCH_UNTER_RISK
+        elif card.card_color == Color.HERZ:
+            risk += _RAMSCH_HERZ_TRUMP_RISK
+
+    for color in _NON_TRUMP_COLORS:
+        cards_of_color = [card for card in player_cards if card.card_color == color]
+        if len(cards_of_color) == 1:
+            blanc_type = cards_of_color[0].card_type
+            if blanc_type == Type.SAU:
+                risk += _RAMSCH_BLANC_SAU_RISK
+            elif blanc_type == Type.TEN:
+                risk += _RAMSCH_BLANC_TEN_RISK
+
+    return risk
+
+
+def wants_to_play_ramsch(player_cards: list[Card]) -> bool:
+    """Decides whether a bot wants to play a Ramsch when nobody else chose
+    a game.
+
+    The bot agrees to play when its hand looks unlikely to accumulate the
+    most points (see ramsch_risk); a riskier hand makes it prefer to redraw
+    instead. Many trumps or blanc Saus/Tens make a Ramsch less attractive,
+    but neither rules it out on its own - only a hand combining several of
+    these risk factors crosses the threshold.
+    """
+
+    return ramsch_risk(player_cards) <= _RAMSCH_RISK_THRESHOLD
