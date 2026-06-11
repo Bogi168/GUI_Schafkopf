@@ -912,9 +912,22 @@ class GUIRenderer(Renderer):
     # ------------------------------------------------------------------
     @staticmethod
     def _result_panel_rect() -> pygame.Rect:
-        rect = pygame.Rect(0, 0, 640, 560)
+        rect = pygame.Rect(0, 0, 640, 700)
         rect.center = (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2)
         return rect
+
+    @staticmethod
+    def _star_points(
+        center: tuple[float, float], outer_radius: float, inner_radius: float
+    ) -> list[tuple[float, float]]:
+        points: list[tuple[float, float]] = []
+        for i in range(10):
+            angle = -math.pi / 2 + i * math.pi / 5
+            radius = outer_radius if i % 2 == 0 else inner_radius
+            points.append(
+                (center[0] + radius * math.cos(angle), center[1] + radius * math.sin(angle))
+            )
+        return points
 
     def _draw_result_panel(self) -> None:
         result = self.state.game_result
@@ -928,47 +941,103 @@ class GUIRenderer(Renderer):
         pygame.draw.rect(self.screen, c.PANEL_BG, panel_rect, border_radius=14)
         pygame.draw.rect(self.screen, c.PANEL_BORDER, panel_rect, width=2, border_radius=14)
 
-        x = panel_rect.left + 30
-        y = panel_rect.top + 20
+        content_x = panel_rect.left + 30
+        content_width = panel_rect.width - 60
+        y = panel_rect.top + 22
 
         title_surf = self.fonts.title.render("Game Result", True, c.TEXT_DARK)
         self.screen.blit(title_surf, title_surf.get_rect(midtop=(panel_rect.centerx, y)))
-        y += 50
+        y += title_surf.get_height() + 8
+        pygame.draw.line(
+            self.screen, c.HIGHLIGHT, (content_x, y), (content_x + content_width, y), 3
+        )
+        y += 14
+
+        winners = set(result.winners)
 
         for team in result.most_point_teams:
+            is_winning_team = any(player in winners for player in team.players)
+            pill_bg = c.RESULT_WIN_BG if is_winning_team else c.RESULT_NEUTRAL_BG
             player_names = ", ".join(player.player_name for player in team.players)
             line = f"{team.team_name}: {team.points} points ({player_names})"
-            self.screen.blit(self.fonts.body.render(line, True, c.TEXT_DARK), (x, y))
-            y += 26
+            text_surf = self.fonts.body.render(line, True, c.TEXT_DARK)
+            pill_rect = pygame.Rect(content_x, y, content_width, text_surf.get_height() + 10)
+            pygame.draw.rect(self.screen, pill_bg, pill_rect, border_radius=8)
+            self.screen.blit(text_surf, text_surf.get_rect(center=pill_rect.center))
+            y += pill_rect.height + 6
 
-        y += 6
-        if len(result.winners) == 1:
-            winners_line = f"Winner: {result.winners[0].player_name}"
+        y += 8
+
+        if result.winners:
+            if len(result.winners) == 1:
+                winners_line = f"Winner: {result.winners[0].player_name}"
+            else:
+                winners_line = "Winners: " + ", ".join(p.player_name for p in result.winners)
+            text_surf = self.fonts.heading.render(winners_line, True, c.TEXT_DARK)
+            badge_rect = pygame.Rect(0, 0, text_surf.get_width() + 120, text_surf.get_height() + 18)
+            badge_rect.centerx = panel_rect.centerx
+            badge_rect.top = y
+            pygame.draw.rect(
+                self.screen, c.RESULT_WINNER_BG, badge_rect, border_radius=badge_rect.height // 2
+            )
+            pygame.draw.rect(
+                self.screen, c.HIGHLIGHT, badge_rect, width=2, border_radius=badge_rect.height // 2
+            )
+            self.screen.blit(text_surf, text_surf.get_rect(center=badge_rect.center))
+            for star_x in (badge_rect.left + 20, badge_rect.right - 20):
+                pygame.draw.polygon(
+                    self.screen, c.HIGHLIGHT, self._star_points((star_x, badge_rect.centery), 10, 4.5)
+                )
+            y += badge_rect.height + 16
         else:
-            winners_line = "Winners: " + ", ".join(p.player_name for p in result.winners)
-        self.screen.blit(self.fonts.heading.render(winners_line, True, c.TEXT_DARK), (x, y))
-        y += 36
+            text_surf = self.fonts.heading.render("No winner this round", True, c.TEXT_DIM)
+            self.screen.blit(text_surf, text_surf.get_rect(midtop=(panel_rect.centerx, y)))
+            y += text_surf.get_height() + 16
 
-        for line in result.game_value_breakdown.split("\n"):
-            line = line.strip()
-            if line:
-                self.screen.blit(self.fonts.body.render(line, True, c.TEXT_DARK), (x, y))
-                y += 24
+        breakdown_lines = [
+            line.strip() for line in result.game_value_breakdown.split("\n") if line.strip()
+        ]
+        if breakdown_lines:
+            line_height = 24
+            box_rect = pygame.Rect(content_x, y, content_width, len(breakdown_lines) * line_height + 16)
+            pygame.draw.rect(self.screen, c.RESULT_NEUTRAL_BG, box_rect, border_radius=8)
+            line_y = box_rect.top + 8
+            for line in breakdown_lines:
+                self.screen.blit(self.fonts.body.render(line, True, c.TEXT_DIM), (box_rect.left + 16, line_y))
+                line_y += line_height
+            y += box_rect.height + 16
 
-        y += 6
         value_surf = self.fonts.heading.render(
-            f"Game value: {result.game_value} cents", True, c.TEXT_DARK
+            f"Game value: {result.game_value} cents", True, c.BUTTON_TEXT
         )
-        self.screen.blit(value_surf, (x, y))
-        y += 44
+        badge_rect = pygame.Rect(0, 0, value_surf.get_width() + 48, value_surf.get_height() + 20)
+        badge_rect.centerx = panel_rect.centerx
+        badge_rect.top = y
+        pygame.draw.rect(self.screen, c.BUTTON_BG, badge_rect, border_radius=badge_rect.height // 2)
+        self.screen.blit(value_surf, value_surf.get_rect(center=badge_rect.center))
+        y += badge_rect.height + 18
 
-        pygame.draw.rect(self.screen, c.PANEL_BORDER, pygame.Rect(x, y, panel_rect.width - 60, 2))
-        y += 16
+        pygame.draw.line(
+            self.screen, c.PANEL_BORDER, (content_x, y), (content_x + content_width, y), 1
+        )
+        y += 14
 
-        for player in result.players:
-            line = f"{player.player_name}: {player.money} cents"
-            self.screen.blit(self.fonts.body.render(line, True, c.TEXT_DARK), (x, y))
-            y += 26
+        money_changes = bool(result.winners) and len(result.winners) != len(result.players)
+        row_height = 32
+        for index, player in enumerate(result.players):
+            row_rect = pygame.Rect(content_x, y, content_width, row_height)
+            if index % 2 == 1:
+                pygame.draw.rect(self.screen, c.RESULT_ROW_ALT_BG, row_rect, border_radius=6)
+            if money_changes:
+                dot_color = c.LAMP_GREEN if player in winners else c.LAMP_RED
+            else:
+                dot_color = c.CARD_BG_DIM
+            pygame.draw.circle(self.screen, dot_color, (row_rect.left + 14, row_rect.centery), 6)
+            name_surf = self.fonts.body.render(player.player_name, True, c.TEXT_DARK)
+            self.screen.blit(name_surf, name_surf.get_rect(midleft=(row_rect.left + 30, row_rect.centery)))
+            money_surf = self.fonts.body.render(f"{player.money} cents", True, c.TEXT_DARK)
+            self.screen.blit(money_surf, money_surf.get_rect(midright=(row_rect.right - 10, row_rect.centery)))
+            y += row_height + 4
 
     # ------------------------------------------------------------------
     # layout helpers

@@ -194,6 +194,38 @@ def test_draw_previous_round_does_not_crash(renderer, eichel_sau, gruen_sau):
     renderer._draw((0, 0))
 
 
+def test_draw_result_panel_highlights_winning_team_and_players(
+    renderer, players, player_1, player_2, team_two_players_1, team_two_players_2
+):
+    team_two_players_1.points = 64
+    team_two_players_2.points = 56
+    renderer.render_game_result(
+        result=GameResult(
+            most_point_teams=[team_two_players_1],
+            winners=[player_1, player_2],
+            game_value=20,
+            game_value_breakdown="\nCall price:  20 cents\nSchneider:   + 10 cents",
+            players=players,
+        )
+    )
+
+    renderer._draw((0, 0))
+
+
+def test_draw_result_panel_handles_no_winners(renderer, players):
+    renderer.render_game_result(
+        result=GameResult(
+            most_point_teams=[],
+            winners=[],
+            game_value=0,
+            game_value_breakdown="",
+            players=players,
+        )
+    )
+
+    renderer._draw((0, 0))
+
+
 def test_render_farewell_shows_centered_announcement_and_requests_quit(renderer):
     renderer.render_farewell("\nThank you for playing!")
 
