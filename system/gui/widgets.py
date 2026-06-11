@@ -39,6 +39,25 @@ class Button:
         return self.enabled and self.rect.collidepoint(pos)
 
 
+def wrap_text(text: str, font: pygame.font.Font, max_width: int) -> list[str]:
+    """Splits `text` into lines that each fit within `max_width` pixels of `font`."""
+
+    words = text.split(" ")
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if font.size(candidate)[0] <= max_width:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines or [""]
+
+
 @dataclass
 class TextInput:
     """A simple single-line text input box with a blinking cursor."""

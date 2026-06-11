@@ -12,6 +12,7 @@ from game_classes.game_modes.Wenz import Wenz
 from system.gui import constants as c
 from system.gui.renderer import GUIRenderer
 from system.gui.state import DealAnimation, PlayedCardEntry
+from system.gui.widgets import wrap_text
 from system.Renderer import ColorChoiceKind, GameResult, YesNoKind
 from system.text import (
     no_game_phrase,
@@ -200,7 +201,7 @@ def test_render_no_game_message_hides_lamps(renderer):
 def test_draw_bot_seat_with_lamp_does_not_crash(renderer):
     renderer.render_game_mode(game_mode_name=None, chooser=None)
 
-    renderer._draw((0, 0))
+    renderer.table_view.draw((0, 0))
 
 
 def test_ask_play_again_clears_no_game_message(renderer, monkeypatch):
@@ -214,22 +215,22 @@ def test_ask_play_again_clears_no_game_message(renderer, monkeypatch):
 
 def test_previous_round_button_toggles_and_dismisses_on_click(renderer, eichel_sau):
     renderer.state.previous_round_cards = [PlayedCardEntry(seat=0, card=eichel_sau)]
-    renderer._draw((0, 0))
+    renderer.table_view.draw((0, 0))
 
     button_pos = c.PREVIOUS_ROUND_BUTTON_RECT.center
     renderer._handle_click(button_pos)
     assert renderer.state.show_previous_round is True
 
-    renderer._draw((0, 0))
+    renderer.table_view.draw((0, 0))
     renderer._handle_click((c.WINDOW_WIDTH - 1, c.WINDOW_HEIGHT - 1))
     assert renderer.state.show_previous_round is False
 
 
 def test_previous_round_button_hidden_when_no_round_played(renderer):
     renderer.state.previous_round_cards = []
-    renderer._draw((0, 0))
+    renderer.table_view.draw((0, 0))
 
-    assert renderer._previous_round_button is None
+    assert renderer.table_view.hit_test().previous_round_button is None
 
     button_pos = c.PREVIOUS_ROUND_BUTTON_RECT.center
     renderer._handle_click(button_pos)
@@ -244,7 +245,7 @@ def test_draw_previous_round_does_not_crash(renderer, eichel_sau, gruen_sau):
     ]
     renderer.state.show_previous_round = True
 
-    renderer._draw((0, 0))
+    renderer.table_view.draw((0, 0))
 
 
 def test_draw_result_panel_highlights_winning_team_and_players(
@@ -262,7 +263,7 @@ def test_draw_result_panel_highlights_winning_team_and_players(
         )
     )
 
-    renderer._draw((0, 0))
+    renderer.table_view.draw((0, 0))
 
 
 def test_draw_result_panel_handles_no_winners(renderer, players):
@@ -276,7 +277,7 @@ def test_draw_result_panel_handles_no_winners(renderer, players):
         )
     )
 
-    renderer._draw((0, 0))
+    renderer.table_view.draw((0, 0))
 
 
 def test_render_farewell_shows_centered_announcement_and_requests_quit(renderer):
@@ -285,7 +286,7 @@ def test_render_farewell_shows_centered_announcement_and_requests_quit(renderer)
     assert renderer.state.choice_announcement == "Thank you for playing!"
     assert renderer._should_quit is True
 
-    renderer._draw((0, 0))
+    renderer.table_view.draw((0, 0))
 
 
 def test_render_shuffle_cards_resets_hands_and_clears_afterwards(renderer, eichel_sau):
@@ -335,20 +336,20 @@ def test_render_deal_cards_inserts_new_cards_in_sorted_order(
 def test_draw_shuffle_is_noop_when_not_shuffling(renderer):
     renderer.state.shuffle_start_time = None
 
-    renderer._draw_shuffle()
+    renderer.table_view._draw_shuffle()
 
 
 def test_draw_shuffle_does_not_crash_while_active(renderer):
     renderer.state.shuffle_start_time = time.time()
     renderer.state.shuffle_duration = 1.0
 
-    renderer._draw_shuffle()
+    renderer.table_view._draw_shuffle()
 
 
 def test_draw_dealing_card_is_noop_when_not_dealing(renderer):
     renderer.state.dealing_card = None
 
-    renderer._draw_dealing_card()
+    renderer.table_view._draw_dealing_card()
 
 
 def test_draw_dealing_card_does_not_crash_while_active(renderer):
@@ -356,15 +357,15 @@ def test_draw_dealing_card_does_not_crash_while_active(renderer):
         seat=c.LEFT, start_time=time.time(), duration=0.12
     )
 
-    renderer._draw_dealing_card()
+    renderer.table_view._draw_dealing_card()
 
 
 def test_deal_target_returns_seat_hand_positions(renderer):
-    assert renderer._deal_target(c.LEFT) == c.SEAT_HAND_CENTER[c.LEFT]
-    assert renderer._deal_target(c.TOP) == c.SEAT_HAND_CENTER[c.TOP]
-    assert renderer._deal_target(c.RIGHT) == c.SEAT_HAND_CENTER[c.RIGHT]
+    assert renderer.table_view._deal_target(c.LEFT) == c.SEAT_HAND_CENTER[c.LEFT]
+    assert renderer.table_view._deal_target(c.TOP) == c.SEAT_HAND_CENTER[c.TOP]
+    assert renderer.table_view._deal_target(c.RIGHT) == c.SEAT_HAND_CENTER[c.RIGHT]
 
-    bottom_x, bottom_y = renderer._deal_target(c.BOTTOM)
+    bottom_x, bottom_y = renderer.table_view._deal_target(c.BOTTOM)
     assert bottom_x == c.WINDOW_WIDTH // 2
 
 
@@ -376,7 +377,7 @@ def test_draw_does_not_crash_during_dealing_animation(renderer):
     )
     renderer.state.hand_sizes = [2, 1, 1, 1]
 
-    renderer._draw((0, 0))
+    renderer.table_view.draw((0, 0))
 
 
 def test_main_loop_exits_after_farewell(renderer, monkeypatch):
@@ -590,12 +591,12 @@ def test_request_submit_round_trip_unblocks_ask_yes_no(renderer, player_2):
 
 
 # ---------------------------------------------------------------------------
-# _wrap_text
+# wrap_text
 # ---------------------------------------------------------------------------
 
 
 def test_wrap_text_returns_single_line_when_it_fits(renderer):
-    lines = renderer._wrap_text("Short text", renderer.fonts.heading, 400)
+    lines = wrap_text("Short text", renderer.fonts.heading, 400)
 
     assert lines == ["Short text"]
 
@@ -604,7 +605,7 @@ def test_wrap_text_wraps_long_text_into_multiple_lines(renderer):
     text = "one two three four five six seven eight"
     max_width = renderer.fonts.heading.size("one two three")[0]
 
-    lines = renderer._wrap_text(text, renderer.fonts.heading, max_width)
+    lines = wrap_text(text, renderer.fonts.heading, max_width)
 
     assert len(lines) > 1
     assert " ".join(lines) == text
@@ -613,6 +614,6 @@ def test_wrap_text_wraps_long_text_into_multiple_lines(renderer):
 
 
 def test_wrap_text_empty_string_returns_single_empty_line(renderer):
-    lines = renderer._wrap_text("", renderer.fonts.heading, 100)
+    lines = wrap_text("", renderer.fonts.heading, 100)
 
     assert lines == [""]

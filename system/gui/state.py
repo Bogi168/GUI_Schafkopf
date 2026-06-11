@@ -77,3 +77,5 @@ class TableState:
     shuffle_start_time: float | None = None
     shuffle_duration: float = 0.0
     dealing_card: DealAnimation | None = None
+    # Set by GUIRenderer._run_game if the game-logic thread crashes.
+    game_error: str | None = None
