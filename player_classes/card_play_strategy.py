@@ -238,9 +238,20 @@ def _choose_lead_card(
 
     if context.is_ramsch:
         non_trump = [card for card in legal_cards if card not in trumps]
-        pool = non_trump or legal_cards
+        if non_trump:
+            # Low points first; on ties prefer the shortest suit to work
+            # towards a void for dumping points later.
+            return min(
+                non_trump,
+                key=lambda card: (
+                    card.card_type.points,
+                    _non_trump_suit_count(player.player_cards, card.card_color, trumps),
+                    cpc.get_card_power(card),
+                ),
+            )
         return min(
-            pool, key=lambda card: (card.card_type.points, cpc.get_card_power(card))
+            legal_cards,
+            key=lambda card: (card.card_type.points, cpc.get_card_power(card)),
         )
 
     if context.is_tout and not context.team_knowledge.teammates:
@@ -425,24 +436,67 @@ def _choose_follow_card(
     is_teammate_winning = winner_player in context.team_knowledge.teammates
 
     if context.is_tout:
-        if is_last_to_act and is_teammate_winning:
-            # The trick is already secured for our side either way - don't
-            # waste a card that could matter in a future trick.
+        unseen = _remaining_unseen_cards(
+            own_hand=player.player_cards,
+            played_cards_history=context.played_cards_history,
+            current_trick_cards=cards_so_far,
+        )
+        guaranteed_winners = [
+            card
+            for card in winning_cards
+            if _is_highest_remaining(card, unseen, trumps, cpc)
+        ]
+
+        if not context.team_knowledge.teammates:
+            # The Tout chooser must win every single trick - a cheap winner
+            # that a later defender overtakes loses the whole game.
+            if is_last_to_act and winning_cards:
+                return min(winning_cards, key=cpc.get_card_power)
+            if guaranteed_winners:
+                return min(guaranteed_winners, key=cpc.get_card_power)
+            if winning_cards:
+                # Nothing is safe from being overtaken - the strongest card
+                # is the best bet to stay ahead.
+                return max(winning_cards, key=cpc.get_card_power)
             return _safe_low_card(legal_cards, trumps, cpc)
+
+        # A defender only needs to win one trick to defeat the Tout.
+        chooser_has_acted = any(
+            trick_player in context.team_knowledge.opponents
+            for trick_player in players_so_far
+        )
+        if chooser_has_acted and is_teammate_winning:
+            # A teammate already beat the chooser - the trick (and with it
+            # the game) belongs to the defense, don't waste anything.
+            return _safe_low_card(legal_cards, trumps, cpc)
+        if chooser_has_acted:
+            if winning_cards:
+                # Beating the chooser's card ends the Tout right here.
+                return min(winning_cards, key=cpc.get_card_power)
+            return _safe_low_card(legal_cards, trumps, cpc)
+        # The chooser still has to act: commit a card nothing can beat if
+        # we have one, otherwise raise the pressure cheaply.
+        if guaranteed_winners:
+            return min(guaranteed_winners, key=cpc.get_card_power)
         if winning_cards:
             return min(winning_cards, key=cpc.get_card_power)
         return _safe_low_card(legal_cards, trumps, cpc)
 
     if context.is_ramsch:
-        if winning_cards:
-            if losing_cards:
-                return _safe_low_card(losing_cards, trumps, cpc)
-            # Forced to take the trick - minimise the damage.
-            return min(
-                winning_cards,
+        if losing_cards:
+            # Ducking is final - a losing card can never end up taking the
+            # trick - so dump the most points (and the most dangerous card
+            # on ties) onto whoever wins it.
+            return max(
+                losing_cards,
                 key=lambda card: (card.card_type.points, cpc.get_card_power(card)),
             )
-        return _safe_low_card(legal_cards, trumps, cpc)
+        # Forced to take the trick - minimise the points taken, spending
+        # the most dangerous card while doing so.
+        return min(
+            winning_cards,
+            key=lambda card: (card.card_type.points, -cpc.get_card_power(card)),
+        )
 
     if is_teammate_winning:
         if winning_cards:
@@ -496,7 +550,16 @@ def _choose_follow_card(
                 card for card in legal_cards if card.card_type not in cpc.trump_types
             ]
             if schmier_candidates:
-                return max(schmier_candidates, key=lambda card: card.card_type.points)
+
+                def schmier_priority(card: Card) -> float:
+                    # Feed the Ten before the Sau: nearly the same points,
+                    # but a non-trump Sau is the boss of its suit and may
+                    # still win a trick of its own later.
+                    if card.card_type == Type.SAU and card not in trumps:
+                        return 9.5
+                    return card.card_type.points
+
+                return max(schmier_candidates, key=schmier_priority)
             return _safe_low_card(legal_cards, trumps, cpc)
         # Too risky - an opponent could still overtake, don't feed points.
         return _safe_low_card(legal_cards, trumps, cpc)

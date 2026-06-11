@@ -757,7 +757,7 @@ def test_follow_ramsch_ducks_when_possible(
     assert result == gruen_seven
 
 
-def test_follow_ramsch_forced_win_minimises_points(
+def test_follow_ramsch_forced_win_minimises_points_with_most_dangerous_card(
     gruen_eight, gruen_ober, eichel_ober, sauspiel_trumps
 ):
     cpc = RamschCardPowerCalculator()
@@ -768,7 +768,9 @@ def test_follow_ramsch_forced_win_minimises_points(
 
     result = choose_card_to_play(player, [gruen_ober, eichel_ober], context)
 
-    assert result == gruen_ober
+    # Both Ober cost the same 3 points, but the Eichel Ober would win an
+    # unwanted trick later anyway - shed it now while the trick is cheap.
+    assert result == eichel_ober
 
 
 # choose_card_to_play - Tout following
@@ -951,3 +953,209 @@ def test_lead_claims_trick_with_trump_when_threats_trumpless(
     )
 
     assert result == herz_ober
+
+
+# Ramsch: dumping points and void-seeking
+
+
+def test_follow_ramsch_dumps_highest_points_when_ducking(
+    gruen_sau, gruen_ten, gruen_seven, sauspiel_trumps
+):
+    # The Gruen Sau already has the trick - both the Ten and the Seven
+    # duck under it, so give the winner the 10 points instead of 0.
+    cpc = RamschCardPowerCalculator()
+    player = _FakePlayer(player_cards=[gruen_ten, gruen_seven])
+    context = _context(
+        current_trick=[("p", gruen_sau)], trumps=sauspiel_trumps, cpc=cpc, is_ramsch=True
+    )
+
+    result = choose_card_to_play(player, [gruen_ten, gruen_seven], context)
+
+    assert result == gruen_ten
+
+
+def test_follow_ramsch_dumps_dangerous_trump_on_equal_points(
+    eichel_ober, herz_ten, eichel_ten, eichel_seven, sauspiel_trumps
+):
+    # Trump was led and a higher trump is winning - both Tens lose and
+    # cost 10 points either way, but the Herz Ten is itself a trump that
+    # could win an unwanted trick later. Shed it first.
+    cpc = RamschCardPowerCalculator()
+    player = _FakePlayer(player_cards=[herz_ten, eichel_ten, eichel_seven])
+    context = _context(
+        current_trick=[("p", eichel_ober)],
+        trumps=sauspiel_trumps,
+        cpc=cpc,
+        is_ramsch=True,
+    )
+
+    result = choose_card_to_play(player, [herz_ten, eichel_ten], context)
+
+    assert result == herz_ten
+
+
+def test_lead_ramsch_prefers_shortest_suit_on_equal_points(
+    eichel_seven, eichel_eight, eichel_nine, schellen_eight, sauspiel_trumps
+):
+    # All candidates are worth 0 points - lead the blanc Schellen to void
+    # the suit and open a slot for dumping points later.
+    cpc = RamschCardPowerCalculator()
+    hand = [eichel_seven, eichel_eight, eichel_nine, schellen_eight]
+    player = _FakePlayer(player_cards=hand)
+    context = _context(trumps=sauspiel_trumps, cpc=cpc, is_ramsch=True)
+
+    result = choose_card_to_play(player, hand, context)
+
+    assert result == schellen_eight
+
+
+# Tout: chooser must never be overtaken, defenders need only one trick
+
+
+def test_follow_tout_chooser_plays_guaranteed_winner_over_cheapest(
+    schellen_ober, herz_ober, eichel_ober, sauspiel_trumps
+):
+    # The cheap Herz Ober wins for now, but a defender behind could hold
+    # the Gruen Ober - only the Eichel Ober keeps the Tout safe.
+    player = _FakePlayer(player_cards=[herz_ober, eichel_ober])
+    context = _context(
+        current_trick=[("defender", schellen_ober)],
+        trumps=sauspiel_trumps,
+        is_tout=True,
+        opponents=["defender", "d2", "d3"],
+    )
+
+    result = choose_card_to_play(player, [herz_ober, eichel_ober], context)
+
+    assert result == eichel_ober
+
+
+def test_follow_tout_chooser_plays_strongest_when_nothing_is_guaranteed(
+    schellen_ober, herz_ober, gruen_ober, sauspiel_trumps
+):
+    # The unseen Eichel Ober beats everything in hand - the Gruen Ober is
+    # still the best bet to stay ahead of the defenders.
+    player = _FakePlayer(player_cards=[herz_ober, gruen_ober])
+    context = _context(
+        current_trick=[("defender", schellen_ober)],
+        trumps=sauspiel_trumps,
+        is_tout=True,
+        opponents=["defender", "d2", "d3"],
+    )
+
+    result = choose_card_to_play(player, [herz_ober, gruen_ober], context)
+
+    assert result == gruen_ober
+
+
+def test_follow_tout_chooser_wins_cheaply_when_last_to_act(
+    schellen_ober, gruen_seven, schellen_seven, herz_ober, eichel_ober, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[herz_ober, eichel_ober])
+    context = _context(
+        current_trick=[
+            ("d1", schellen_ober),
+            ("d2", gruen_seven),
+            ("d3", schellen_seven),
+        ],
+        trumps=sauspiel_trumps,
+        is_tout=True,
+        opponents=["d1", "d2", "d3"],
+    )
+
+    result = choose_card_to_play(player, [herz_ober, eichel_ober], context)
+
+    assert result == herz_ober
+
+
+def test_follow_tout_defender_saves_cards_once_teammate_beat_the_chooser(
+    herz_ober, gruen_ober, eichel_ober, schellen_seven, sauspiel_trumps
+):
+    # The teammate's Gruen Ober already beat the chooser's Herz Ober - the
+    # defense has won the game, don't burn the Eichel Ober on top.
+    player = _FakePlayer(player_cards=[eichel_ober, schellen_seven])
+    context = _context(
+        current_trick=[("chooser", herz_ober), ("teammate", gruen_ober)],
+        trumps=sauspiel_trumps,
+        is_tout=True,
+        teammates=["teammate", "d3"],
+        opponents=["chooser"],
+    )
+
+    result = choose_card_to_play(player, [eichel_ober, schellen_seven], context)
+
+    assert result == schellen_seven
+
+
+def test_follow_tout_defender_commits_guaranteed_winner_before_chooser_acts(
+    schellen_ober, herz_ober, eichel_ober, sauspiel_trumps
+):
+    # The chooser still has to act: the cheap Herz Ober could be overtaken,
+    # but the Eichel Ober wins the trick - and the game - for sure.
+    player = _FakePlayer(player_cards=[herz_ober, eichel_ober])
+    context = _context(
+        current_trick=[("teammate", schellen_ober)],
+        trumps=sauspiel_trumps,
+        is_tout=True,
+        teammates=["teammate", "d3"],
+        opponents=["chooser"],
+    )
+
+    result = choose_card_to_play(player, [herz_ober, eichel_ober], context)
+
+    assert result == eichel_ober
+
+
+def test_follow_tout_defender_beats_chooser_cheaply_when_chooser_acted(
+    herz_ober, gruen_ober, eichel_ober, sauspiel_trumps
+):
+    # The chooser's Herz Ober is winning - any winner defeats the Tout, so
+    # the cheaper Gruen Ober does the job.
+    player = _FakePlayer(player_cards=[gruen_ober, eichel_ober])
+    context = _context(
+        current_trick=[("chooser", herz_ober)],
+        trumps=sauspiel_trumps,
+        is_tout=True,
+        teammates=["d2", "d3"],
+        opponents=["chooser"],
+    )
+
+    result = choose_card_to_play(player, [gruen_ober, eichel_ober], context)
+
+    assert result == gruen_ober
+
+
+# Schmieren: feed the Ten before the Sau
+
+
+def test_follow_schmier_feeds_ten_before_suit_sau(
+    eichel_ober, schellen_ten, schellen_sau, sauspiel_trumps
+):
+    # The trick is secure - both Schellen cards would feed big points, but
+    # the Sau is the boss of its suit and may still win a trick of its
+    # own, so give the Ten.
+    player = _FakePlayer(player_cards=[schellen_sau, schellen_ten])
+    context = _context(
+        current_trick=[("teammate", eichel_ober)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+    )
+
+    result = choose_card_to_play(player, [schellen_sau, schellen_ten], context)
+
+    assert result == schellen_ten
+
+
+def test_follow_schmier_still_feeds_suit_sau_over_worthless_cards(
+    eichel_ober, schellen_sau, gruen_seven, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[schellen_sau, gruen_seven])
+    context = _context(
+        current_trick=[("teammate", eichel_ober)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+    )
+
+    result = choose_card_to_play(player, [schellen_sau, gruen_seven], context)
+
+    assert result == schellen_sau
