@@ -3,10 +3,12 @@ from typing import Callable, TYPE_CHECKING
 from card_classes.Cards import Color, Type
 from system.Renderer import YesNoKind, ColorChoiceKind
 from player_classes.bot_strategy import (
+    best_hochzeit_swap_card,
     best_sau_color,
     best_trump_color,
     choose_preferred_game_mode,
     wants_to_double_game_value,
+    wants_to_partner_hochzeit,
     wants_to_play,
     wants_to_play_ramsch,
     wants_to_shoot,
@@ -294,7 +296,7 @@ class Bot(Player):
         return best_trump_color(player_cards=self.player_cards, options=valid)
 
     def ask_for_hochzeit(self) -> bool:
-        return False
+        return wants_to_partner_hochzeit(player_cards=self.player_cards)
 
     def ask_for_ramsch(self) -> bool:
         return wants_to_play_ramsch(player_cards=self.player_cards)
@@ -304,7 +306,9 @@ class Bot(Player):
         move_validator: Callable[[Card], bool],
     ) -> Card:
         legal_cards = [card for card in self.player_cards if move_validator(card)]
-        decision = random.choice(legal_cards)
+        decision = best_hochzeit_swap_card(
+            player_cards=self.player_cards, legal_cards=legal_cards
+        )
         self.player_cards.remove(decision)
         return decision
 

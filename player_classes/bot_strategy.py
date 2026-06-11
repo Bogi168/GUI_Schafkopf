@@ -34,6 +34,13 @@ _DOUBLE_GAME_VALUE_THRESHOLD = _WANT_TO_PLAY_THRESHOLD
 _SOLO_THRESHOLD = 11.0
 _TOUT_THRESHOLD = 16.0
 
+# Accepting a Hochzeit means carrying the partner team almost alone: the
+# game chooser hands over their single trump and contributes points, but no
+# further trump support. That needs a hand clearly stronger than a normal
+# want-to-play hand (8.0), though not full Solo strength (11.0) - the swap
+# adds one trump and the chooser's card points still count for the team.
+_HOCHZEIT_PARTNER_THRESHOLD = 10.0
+
 # Holding this many of the four Unter makes Wenz attractive on its own, even
 # if the rest of the hand wouldn't otherwise reach _SOLO_THRESHOLD.
 _WENZ_MIN_UNTER = 3
@@ -211,6 +218,47 @@ def best_sau_color(player_cards: list[Card], options: dict[str, Color]) -> Color
     return min(
         options.values(), key=lambda color: _non_trump_color_count(player_cards, color)
     )
+
+
+def wants_to_partner_hochzeit(player_cards: list[Card]) -> bool:
+    """Decides whether a bot accepts being the partner of a Hochzeit.
+
+    The partner must hand over a non-trump card in the swap, so a hand of
+    nothing but trumps cannot accept at all (mirroring the allow_yes rule
+    for human players). Beyond that, the bot only accepts when its hand is
+    strong enough to carry the team (see _HOCHZEIT_PARTNER_THRESHOLD).
+    """
+
+    has_card_to_give = any(
+        card.card_type not in (Type.OBER, Type.UNTER)
+        and card.card_color != Color.HERZ
+        for card in player_cards
+    )
+    return (
+        has_card_to_give
+        and hand_strength(player_cards) >= _HOCHZEIT_PARTNER_THRESHOLD
+    )
+
+
+def best_hochzeit_swap_card(
+    player_cards: list[Card], legal_cards: list[Card]
+) -> Card:
+    """Picks the card to hand over in the Hochzeit swap.
+
+    The swap stays within the team, so no card points change sides - what
+    matters is which card leaves this bot's hand. Shedding the weakest card
+    of the shortest non-trump suit works towards a void that can later be
+    trumped, while a Sau is kept whenever possible since it is the
+    strongest card of its suit and a likely trick winner. For the game
+    chooser, whose only legal card is their single trump, the choice is
+    forced anyway.
+    """
+
+    def shed_priority(card: Card) -> tuple[bool, int, int]:
+        suit_length = _non_trump_color_count(player_cards, card.card_color)
+        return (card.card_type == Type.SAU, suit_length, card.card_type)
+
+    return min(legal_cards, key=shed_priority)
 
 
 def ramsch_risk(player_cards: list[Card]) -> float:

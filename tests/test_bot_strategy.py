@@ -1,12 +1,19 @@
 from unittest.mock import MagicMock
 
+from card_classes.Cards import Color, Type
 from player_classes.Player import Bot
 from player_classes.bot_strategy import (
+    best_hochzeit_swap_card,
     ramsch_risk,
     wants_to_double_game_value,
+    wants_to_partner_hochzeit,
     wants_to_play_ramsch,
     wants_to_shoot,
 )
+
+
+def _is_trump(card):
+    return card.card_type in (Type.OBER, Type.UNTER) or card.card_color == Color.HERZ
 
 
 def _bot(player_cards):
@@ -629,3 +636,241 @@ def test_bot_ask_shoot_ramsch_delegates_to_wants_to_play_ramsch(
     ]
 
     assert _bot(safe_hand).ask_shoot(is_ramsch=True) is True
+
+
+def test_wants_to_partner_hochzeit_true_for_strong_hand(
+    eichel_ober,
+    gruen_ober,
+    herz_ober,
+    eichel_unter,
+    eichel_seven,
+    eichel_eight,
+    gruen_seven,
+    gruen_eight,
+):
+    # 3 Ober + 1 Unter = 11.0, well above the partner threshold, with
+    # plenty of non-trump cards to hand over in the swap.
+    hand = [
+        eichel_ober,
+        gruen_ober,
+        herz_ober,
+        eichel_unter,
+        eichel_seven,
+        eichel_eight,
+        gruen_seven,
+        gruen_eight,
+    ]
+
+    assert wants_to_partner_hochzeit(hand) is True
+
+
+def test_wants_to_partner_hochzeit_true_at_threshold(
+    eichel_ober,
+    gruen_ober,
+    eichel_unter,
+    gruen_unter,
+    eichel_seven,
+    eichel_eight,
+    gruen_seven,
+    gruen_eight,
+):
+    # 2 Ober + 2 Unter = 10.0, exactly at the partner threshold.
+    hand = [
+        eichel_ober,
+        gruen_ober,
+        eichel_unter,
+        gruen_unter,
+        eichel_seven,
+        eichel_eight,
+        gruen_seven,
+        gruen_eight,
+    ]
+
+    assert wants_to_partner_hochzeit(hand) is True
+
+
+def test_wants_to_partner_hochzeit_false_for_decent_but_not_strong_hand(
+    eichel_ober,
+    eichel_unter,
+    herz_sau,
+    herz_ten,
+    herz_koenig,
+    herz_nine,
+    eichel_seven,
+    gruen_seven,
+):
+    # 1 Ober + 1 Unter + 4 Herz trumps = 9.0 - a fine Sauspiel hand, but
+    # not strong enough to carry a Hochzeit team almost alone.
+    hand = [
+        eichel_ober,
+        eichel_unter,
+        herz_sau,
+        herz_ten,
+        herz_koenig,
+        herz_nine,
+        eichel_seven,
+        gruen_seven,
+    ]
+
+    assert wants_to_partner_hochzeit(hand) is False
+
+
+def test_wants_to_partner_hochzeit_false_for_all_trump_hand(
+    eichel_ober,
+    gruen_ober,
+    herz_ober,
+    schellen_ober,
+    eichel_unter,
+    gruen_unter,
+    herz_unter,
+    schellen_unter,
+):
+    # Strength 20.0, but every card is a trump - there is no legal card to
+    # hand over in the swap, so accepting is impossible (mirrors the
+    # allow_yes rule for human players).
+    hand = [
+        eichel_ober,
+        gruen_ober,
+        herz_ober,
+        schellen_ober,
+        eichel_unter,
+        gruen_unter,
+        herz_unter,
+        schellen_unter,
+    ]
+
+    assert wants_to_partner_hochzeit(hand) is False
+
+
+def test_best_hochzeit_swap_card_sheds_blanc_card_to_create_a_void(
+    eichel_ober,
+    eichel_unter,
+    herz_sau,
+    gruen_seven,
+    schellen_seven,
+    schellen_eight,
+):
+    # Gruen Seven is the only Gruen card - shedding it voids the suit.
+    hand = [
+        eichel_ober,
+        eichel_unter,
+        herz_sau,
+        gruen_seven,
+        schellen_seven,
+        schellen_eight,
+    ]
+    legal_cards = [card for card in hand if not _is_trump(card)]
+
+    assert best_hochzeit_swap_card(hand, legal_cards) is gruen_seven
+
+
+def test_best_hochzeit_swap_card_keeps_a_blanc_sau(
+    eichel_ober,
+    eichel_unter,
+    herz_sau,
+    gruen_sau,
+    schellen_seven,
+    schellen_eight,
+):
+    # Gruen Sau is blanc, but a Sau is a likely trick winner - the bot
+    # sheds from the longer Schellen suit instead.
+    hand = [
+        eichel_ober,
+        eichel_unter,
+        herz_sau,
+        gruen_sau,
+        schellen_seven,
+        schellen_eight,
+    ]
+    legal_cards = [card for card in hand if not _is_trump(card)]
+
+    assert best_hochzeit_swap_card(hand, legal_cards) is schellen_seven
+
+
+def test_best_hochzeit_swap_card_sheds_weakest_card_of_suit(
+    eichel_ober,
+    schellen_koenig,
+    schellen_ten,
+    schellen_seven,
+):
+    hand = [eichel_ober, schellen_koenig, schellen_ten, schellen_seven]
+    legal_cards = [schellen_koenig, schellen_ten, schellen_seven]
+
+    assert best_hochzeit_swap_card(hand, legal_cards) is schellen_seven
+
+
+def test_best_hochzeit_swap_card_returns_forced_choice(
+    herz_koenig, gruen_sau, eichel_seven
+):
+    # The game chooser's only legal card is their single trump; a Sau is
+    # shed when it is the only legal card.
+    hand = [herz_koenig, gruen_sau, eichel_seven]
+
+    assert best_hochzeit_swap_card(hand, [herz_koenig]) is herz_koenig
+    assert best_hochzeit_swap_card(hand, [gruen_sau]) is gruen_sau
+
+
+def test_bot_ask_for_hochzeit_delegates_to_wants_to_partner_hochzeit(
+    eichel_ober,
+    gruen_ober,
+    herz_ober,
+    eichel_unter,
+    eichel_seven,
+    eichel_eight,
+    gruen_seven,
+    gruen_eight,
+    herz_sau,
+    herz_ten,
+    herz_koenig,
+    herz_nine,
+):
+    strong_hand = [
+        eichel_ober,
+        gruen_ober,
+        herz_ober,
+        eichel_unter,
+        eichel_seven,
+        eichel_eight,
+        gruen_seven,
+        gruen_eight,
+    ]
+    weak_hand = [
+        eichel_ober,
+        eichel_unter,
+        herz_sau,
+        herz_ten,
+        herz_koenig,
+        herz_nine,
+        eichel_seven,
+        gruen_seven,
+    ]
+
+    assert _bot(strong_hand).ask_for_hochzeit() is True
+    assert _bot(weak_hand).ask_for_hochzeit() is False
+
+
+def test_bot_get_card_swap_decision_uses_best_hochzeit_swap_card(
+    eichel_ober,
+    eichel_unter,
+    herz_sau,
+    gruen_seven,
+    schellen_seven,
+    schellen_eight,
+):
+    bot = _bot(
+        [
+            eichel_ober,
+            eichel_unter,
+            herz_sau,
+            gruen_seven,
+            schellen_seven,
+            schellen_eight,
+        ]
+    )
+
+    decision = bot.get_card_swap_decision(
+        move_validator=lambda card: not _is_trump(card)
+    )
+
+    assert decision is gruen_seven
+    assert gruen_seven not in bot.player_cards
