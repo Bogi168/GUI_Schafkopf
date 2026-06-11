@@ -164,21 +164,21 @@ class Game(ABC):
                 key=self.card_power_calculator.get_card_power, reverse=True
             )
 
-    def play_rounds(self, round_manager: RoundManager) -> None:
-        for i in range(len(self.players[0].player_cards)):
-            round_manager.play_round(is_first_round=(i == 0))
-            round_winner: Player = round_manager.get_round_winner()
-            round_manager.reward_round_winner(round_winner=round_winner)
-            round_manager.prepare_next_round(round_winner=round_winner)
-
-    def tout_play_rounds(
-        self, game_chooser: Player, round_manager: RoundManager
+    def play_rounds(
+        self, round_manager: RoundManager, game_chooser: Player | None = None
     ) -> None:
+        """Plays every round, rewarding the winner of each.
+
+        ``game_chooser`` is only set for Tout games (see
+        game_modes.ToutGameMixin): there, the chooser must win every trick,
+        so play stops as soon as a round is won by someone else.
+        """
+
         for i in range(len(self.players[0].player_cards)):
             round_manager.play_round(is_first_round=(i == 0))
             round_winner: Player = round_manager.get_round_winner()
             round_manager.reward_round_winner(round_winner=round_winner)
-            if round_winner != game_chooser:
+            if game_chooser is not None and round_winner != game_chooser:
                 break
             round_manager.prepare_next_round(round_winner=round_winner)
 

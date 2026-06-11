@@ -249,10 +249,10 @@ def test_play_rounds_with_one_card_runs_single_round_as_first_round(
     round_manager.prepare_next_round.assert_called_once_with(round_winner="winner")
 
 
-# tout_play_rounds
+# play_rounds with game_chooser (Tout games)
 
 
-def test_tout_play_rounds_behaves_like_play_rounds_when_chooser_always_wins(
+def test_play_rounds_with_game_chooser_behaves_like_play_rounds_when_chooser_always_wins(
     fake_game, eichel_sau, eichel_seven, player_1
 ):
     for player in fake_game.players:
@@ -261,7 +261,7 @@ def test_tout_play_rounds_behaves_like_play_rounds_when_chooser_always_wins(
     round_manager = MagicMock()
     round_manager.get_round_winner.return_value = player_1
 
-    fake_game.tout_play_rounds(game_chooser=player_1, round_manager=round_manager)
+    fake_game.play_rounds(round_manager=round_manager, game_chooser=player_1)
 
     assert round_manager.play_round.call_count == 2
     round_manager.play_round.assert_has_calls(
@@ -272,7 +272,7 @@ def test_tout_play_rounds_behaves_like_play_rounds_when_chooser_always_wins(
     assert round_manager.prepare_next_round.call_count == 2
 
 
-def test_tout_play_rounds_breaks_when_chooser_loses_first_round(
+def test_play_rounds_with_game_chooser_breaks_when_chooser_loses_first_round(
     fake_game, eichel_sau, eichel_seven, player_1, player_2
 ):
     for player in fake_game.players:
@@ -281,7 +281,7 @@ def test_tout_play_rounds_breaks_when_chooser_loses_first_round(
     round_manager = MagicMock()
     round_manager.get_round_winner.return_value = player_2
 
-    fake_game.tout_play_rounds(game_chooser=player_1, round_manager=round_manager)
+    fake_game.play_rounds(round_manager=round_manager, game_chooser=player_1)
 
     round_manager.play_round.assert_called_once_with(is_first_round=True)
     round_manager.get_round_winner.assert_called_once()
