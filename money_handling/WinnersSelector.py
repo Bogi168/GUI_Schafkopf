@@ -57,40 +57,46 @@ class RamschWinnersSelector(WinnersSelector):
         self.run_through_threshold: int = 91
         self.active_players: list[Player] = active_players
 
+    def _players_not_in(self, teams: list[Team]) -> list[Player]:
+        return [
+            player
+            for team in self.teams
+            for player in team.players
+            if team not in teams
+        ]
+
+    def _players_in(self, teams: list[Team]) -> list[Player]:
+        return [
+            player for team in self.teams for player in team.players if team in teams
+        ]
+
+    def _durchmarsch_winners(self, most_point_teams: list[Team]) -> list[Player]:
+        """The lone team with the most points "ran through" (collected at
+        least run_through_threshold points), reversing the usual outcome:
+        that team wins instead of losing."""
+
+        return [most_point_teams[0].players[0]]
+
+    def _tied_losers_winners(self, most_point_teams: list[Team]) -> list[Player]:
+        """Several teams are tied for the most points and all lose - unless
+        every one of them shot (became active), in which case the ones that
+        didn't shoot win too."""
+
+        winners = self._players_not_in(most_point_teams)
+        losers = self._players_in(most_point_teams)
+        shot_losers = [loser for loser in losers if loser in self.active_players]
+        spared_losers = [loser for loser in losers if loser not in self.active_players]
+        if shot_losers and spared_losers:
+            winners.extend(spared_losers)
+        return winners
+
     def get_game_winners(self) -> list[Player]:
-        winners: list[Player] = []
         most_point_teams: list[Team] = self.get_most_points_teams()
         if len(most_point_teams) > 1:
-            winners: list[Player] = [
-                player
-                for team in self.teams
-                for player in team.players
-                if team not in most_point_teams
-            ]
-            losers: list[Player] = [
-                player
-                for team in self.teams
-                for player in team.players
-                if player not in winners
-            ]
-            if any(loser in self.active_players for loser in losers) and any(
-                loser not in self.active_players for loser in losers
-            ):
-                for loser in losers:
-                    if loser not in self.active_players:
-                        winners.append(loser)
-
-        else:
-            if most_point_teams[0].points >= self.run_through_threshold:
-                winners.append(most_point_teams[0].players[0])
-            else:
-                winners: list[Player] = [
-                    player
-                    for team in self.teams
-                    for player in team.players
-                    if team not in most_point_teams
-                ]
-        return winners
+            return self._tied_losers_winners(most_point_teams)
+        if most_point_teams[0].points >= self.run_through_threshold:
+            return self._durchmarsch_winners(most_point_teams)
+        return self._players_not_in(most_point_teams)
 
 
 class ToutWinnersSelector(WinnersSelector):
