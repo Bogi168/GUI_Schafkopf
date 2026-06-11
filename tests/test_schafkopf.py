@@ -314,10 +314,10 @@ def test_players_choose_game_second_chooser_overrides_with_higher_rank(
     assert result is sentinel_game
     get_game_mock.assert_called_once_with(game_mode=Wenz, chooser=bot2)
 
-    # First chooser is asked without quitting_possible (defaults to False).
+    # First chooser cannot quit since there is no previous pick yet.
     bot1_kwargs = bot1_mock.call_args.kwargs
     assert bot1_kwargs["prev_game_mode"] is None
-    assert "quitting_possible" not in bot1_kwargs
+    assert bot1_kwargs["quitting_possible"] is False
 
     # Second chooser cannot quit since the current pick (Sauspiel) is not
     # ranked above Sauspiel, so quitting_possible=False.

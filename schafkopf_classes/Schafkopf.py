@@ -159,48 +159,30 @@ class Schafkopf:
                 return self.get_game(game_mode=Ramsch, chooser=game_chooser)
             else:
                 return None
-        else:
-            for player in self.game_choosers:
-                if game_mode is None:
-                    decision: type[Game] | None = player.choose_game_mode(
-                        prev_game_mode=game_mode,
-                    )
-                    self.renderer.render_game_mode_decision(
-                        player=player, game_mode=decision
-                    )
-                    game_mode = decision
-                    game_chooser = player
 
-                elif (
-                    self.choosable_game_rank_mapping[game_mode]
-                    > self.choosable_game_rank_mapping[Sauspiel]
-                ):
-                    decision = player.choose_game_mode(
-                        prev_game_mode=game_mode,
-                        quitting_possible=True,
-                    )
-                    self.renderer.render_game_mode_decision(
-                        player=player, game_mode=decision
-                    )
-                    if decision is None:
-                        continue
-                    else:
-                        game_mode = decision
-                        game_chooser = player
+        sauspiel_rank = self.choosable_game_rank_mapping[Sauspiel]
+        for player in self.game_choosers:
+            # Once a player has picked a game ranked above Sauspiel, later
+            # players may pass (quit) and keep that pick instead of having
+            # to overbid it.
+            quitting_possible = (
+                game_mode is not None
+                and self.choosable_game_rank_mapping[game_mode] > sauspiel_rank
+            )
+            decision: type[Game] | None = player.choose_game_mode(
+                prev_game_mode=game_mode,
+                quitting_possible=quitting_possible,
+            )
+            self.renderer.render_game_mode_decision(player=player, game_mode=decision)
 
-                else:
-                    decision = player.choose_game_mode(
-                        prev_game_mode=game_mode,
-                        quitting_possible=False,
-                    )
-                    self.renderer.render_game_mode_decision(
-                        player=player, game_mode=decision
-                    )
-                    game_mode = decision
-                    game_chooser = player
+            if decision is None:
+                continue
 
-                if game_mode is SoloTout:
-                    break
+            game_mode = decision
+            game_chooser = player
+
+            if game_mode is SoloTout:
+                break
 
         assert game_mode is not None
         return self.get_game(game_mode=game_mode, chooser=game_chooser)
