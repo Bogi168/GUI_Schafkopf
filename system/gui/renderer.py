@@ -22,6 +22,7 @@ import pygame
 from card_classes.Cards import Color
 from system.Renderer import ColorChoiceKind, Renderer, YesNoKind
 from system.gui import constants as c
+from system.gui.sounds import SoundPlayer
 from system.gui.state import DealAnimation, PendingRequest, PlayedCardEntry, TableState
 from system.gui.table_view import TableView
 from system.text import (
@@ -74,6 +75,7 @@ class GUIRenderer(Renderer):
         self.table_view = TableView(
             screen=self.screen, fonts=self.fonts, state=self.state, lock=self.lock
         )
+        self.sounds = SoundPlayer()
 
         self._seat_index: dict[str, int] = {}
 
@@ -219,11 +221,13 @@ class GUIRenderer(Renderer):
             self.state.hand_sizes[seat] = max(0, self.state.hand_sizes[seat] - 1)
             if seat == c.BOTTOM and card in self.state.human_hand:
                 self.state.human_hand.remove(card)
+        self.sounds.play_card_played()
 
     def render_trick_winner(self, winner: Player) -> None:
         seat = self._ensure_seat(winner)
         with self.lock:
             self.state.trick_winner_seat = seat
+        self.sounds.play_trick_won()
         time.sleep(1.0)
         with self.lock:
             self.state.previous_round_cards = list(self.state.center_cards)

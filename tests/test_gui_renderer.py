@@ -1,8 +1,10 @@
 import os
 import threading
 import time
+from unittest.mock import MagicMock
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pytest
 
@@ -28,6 +30,22 @@ def renderer(players, monkeypatch) -> GUIRenderer:
     gui_renderer = GUIRenderer()
     gui_renderer.set_players(players)
     return gui_renderer
+
+
+def test_render_played_card_plays_card_sound(renderer, players, eichel_sau):
+    renderer.sounds = MagicMock()
+
+    renderer.render_played_card(player=players[0], card=eichel_sau)
+
+    renderer.sounds.play_card_played.assert_called_once_with()
+
+
+def test_render_trick_winner_plays_trick_won_sound(renderer, players):
+    renderer.sounds = MagicMock()
+
+    renderer.render_trick_winner(winner=players[0])
+
+    renderer.sounds.play_trick_won.assert_called_once_with()
 
 
 def test_render_trick_winner_stores_previous_round_cards(
