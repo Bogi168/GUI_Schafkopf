@@ -68,6 +68,10 @@ class Game(ABC):
         self.amount_game_value_doubles: int = amount_game_value_doubles
         self.players: list[Player] = players
         self.trump_color: Color | None = trump_color
+        # Wenz/WenzTout pass trump_types=[Type.UNTER] and trump_color=None,
+        # which is the only combination yielding exactly the 4 Unter as
+        # trumps; bot_strategy.wants_to_shoot relies on this to detect the
+        # Wenz family via len(trumps).
         self.trumps: list[Card] = [
             card
             for card in cards.full_deck

@@ -339,6 +339,8 @@ def wants_to_shoot(
     if is_tout:
         return _can_guarantee_a_trick(player_cards, trumps)
 
+    # Only Wenz/WenzTout build a trumps list this short (see Game.__init__);
+    # every other mode has 14 trumps.
     if len(trumps) <= _WENZ_TRUMP_COUNT:
         trump_count = sum(1 for card in player_cards if card in trumps)
         return trump_count > len(trumps) / 2

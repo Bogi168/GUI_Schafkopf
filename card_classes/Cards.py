@@ -76,7 +76,7 @@ class Card:
 
     card_color: Color
     card_type: Type
-    card_name: str = None
+    card_name: str | None = None
 
     def __post_init__(self) -> None:
         if self.card_name is None:
