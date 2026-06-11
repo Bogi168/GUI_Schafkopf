@@ -7,6 +7,7 @@ from player_classes.card_play_strategy import (
     CardPlayContext,
     _is_highest_remaining,
     _non_trump_suit_count,
+    _players_void_of_suit,
     _players_void_of_trumps,
     _remaining_unseen_cards,
     _safe_low_card,
@@ -1159,3 +1160,176 @@ def test_follow_schmier_still_feeds_suit_sau_over_worthless_cards(
     result = choose_card_to_play(player, [schellen_sau, gruen_seven], context)
 
     assert result == schellen_sau
+
+
+# _players_void_of_suit
+
+
+def test_players_void_of_suit_detects_discard_and_trumping(
+    gruen_eight, schellen_seven, herz_unter, gruen_nine, sauspiel_trumps
+):
+    # On a Gruen lead, "discarder" threw off a Schellen and "trumper"
+    # trumped in - both are proven void of Gruen. "follower" followed suit
+    # and proves nothing.
+    trick_history = [
+        [
+            ("leader", gruen_eight),
+            ("discarder", schellen_seven),
+            ("trumper", herz_unter),
+            ("follower", gruen_nine),
+        ]
+    ]
+    context = _context(trumps=sauspiel_trumps, trick_history=trick_history)
+
+    assert _players_void_of_suit(context, Color.GRUEN) == {"discarder", "trumper"}
+    assert _players_void_of_suit(context, Color.SCHELLEN) == set()
+
+
+def test_players_void_of_suit_ignores_trump_leads(
+    herz_ober, gruen_seven, sauspiel_trumps
+):
+    # Discarding a Gruen card on a trump lead proves nothing about Gruen.
+    trick_history = [[("leader", herz_ober), ("other", gruen_seven)]]
+    context = _context(trumps=sauspiel_trumps, trick_history=trick_history)
+
+    assert _players_void_of_suit(context, Color.GRUEN) == set()
+
+
+# Schmieren with suit-void knowledge
+
+
+def test_follow_schmiers_when_remaining_opponent_void_of_suit_and_trumps(
+    herz_ober,
+    schellen_eight,
+    gruen_eight,
+    schellen_nine,
+    gruen_koenig,
+    gruen_seven,
+    schellen_ten,
+    eichel_seven,
+    sauspiel_trumps,
+):
+    # Teammate's Gruen König is winning. The Gruen Sau and Ten are still
+    # out, but the only player yet to act (opp2) was proven void of both
+    # trumps and Gruen in earlier tricks - the König cannot be beaten.
+    trick_history = [
+        [("teammate", herz_ober), ("opp2", schellen_eight)],
+        [("teammate", gruen_eight), ("opp2", schellen_nine)],
+    ]
+    player = _FakePlayer(player_cards=[schellen_ten, eichel_seven])
+    context = _context(
+        current_trick=[("teammate", gruen_koenig), ("opp1", gruen_seven)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opp1", "opp2"],
+        trick_history=trick_history,
+    )
+
+    result = choose_card_to_play(player, [schellen_ten, eichel_seven], context)
+
+    assert result == schellen_ten
+
+
+def test_follow_holds_back_when_remaining_opponent_may_hold_the_suit(
+    herz_ober,
+    schellen_eight,
+    gruen_koenig,
+    gruen_seven,
+    schellen_ten,
+    eichel_seven,
+    sauspiel_trumps,
+):
+    # Same trick, but opp2 is only proven void of trumps - the unseen
+    # Gruen Sau or Ten could still overtake the König.
+    trick_history = [[("teammate", herz_ober), ("opp2", schellen_eight)]]
+    player = _FakePlayer(player_cards=[schellen_ten, eichel_seven])
+    context = _context(
+        current_trick=[("teammate", gruen_koenig), ("opp1", gruen_seven)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opp1", "opp2"],
+        trick_history=trick_history,
+    )
+
+    result = choose_card_to_play(player, [schellen_ten, eichel_seven], context)
+
+    assert result == eichel_seven
+
+
+# Taking an opponent's trick with a card that cannot be overtaken
+
+
+def test_follow_takes_fat_trick_with_secure_winner_over_cheapest(
+    gruen_sau, herz_unter, eichel_ober, sauspiel_trumps
+):
+    # 11 points on the table: the cheap Herz Unter could be overtrumped by
+    # whoever still has to act, donating its points on top - the Eichel
+    # Ober takes the trick for sure.
+    player = _FakePlayer(player_cards=[herz_unter, eichel_ober])
+    context = _context(
+        current_trick=[("opp1", gruen_sau)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opp1", "opp2"],
+    )
+
+    result = choose_card_to_play(player, [herz_unter, eichel_ober], context)
+
+    assert result == eichel_ober
+
+
+def test_follow_takes_small_trick_with_cheapest_winner(
+    gruen_koenig, herz_unter, eichel_ober, sauspiel_trumps
+):
+    # Only 4 points on the table - not worth committing the Eichel Ober,
+    # gamble with the cheapest winner as before.
+    player = _FakePlayer(player_cards=[herz_unter, eichel_ober])
+    context = _context(
+        current_trick=[("opp1", gruen_koenig)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opp1", "opp2"],
+    )
+
+    result = choose_card_to_play(player, [herz_unter, eichel_ober], context)
+
+    assert result == herz_unter
+
+
+# Cashing sure winners with suit-void knowledge
+
+
+def test_lead_cashes_ten_when_threats_void_of_trumps_and_suit(
+    herz_ober,
+    eichel_nine,
+    eichel_eight,
+    gruen_seven,
+    schellen_eight,
+    schellen_seven,
+    gruen_ten,
+    eichel_koenig,
+    sauspiel_trumps,
+):
+    # Both threats failed to follow a trump lead and a Gruen lead. The
+    # Gruen Sau is still out, but only the teammate can hold it - leading
+    # the Gruen Ten keeps the trick in the team either way.
+    trick_history = [
+        [("teammate", herz_ober), ("partner", eichel_nine), ("chooser", eichel_eight)],
+        [
+            ("teammate", gruen_seven),
+            ("partner", schellen_eight),
+            ("chooser", schellen_seven),
+        ],
+    ]
+    player = _FakePlayer(player_cards=[gruen_ten, eichel_koenig])
+    context = _context(
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["partner", "chooser"],
+        trick_history=trick_history,
+        tricks_remaining=2,
+    )
+
+    result = choose_card_to_play(player, [gruen_ten, eichel_koenig], context)
+
+    assert result == gruen_ten

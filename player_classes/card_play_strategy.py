@@ -143,39 +143,64 @@ def _players_void_of_trumps(context: CardPlayContext) -> set[Player]:
     return void
 
 
+def _players_void_of_suit(context: CardPlayContext, color: Color) -> set[Player]:
+    """Players proven void of the non-trump suit ``color`` by failing to
+    follow a lead of that suit (Farbzwang) - whether they trumped in or
+    discarded another suit."""
+
+    void: set[Player] = set()
+    for trick in context.trick_history:
+        if not trick:
+            continue
+        lead_card = trick[0][1]
+        if lead_card in context.trumps or lead_card.card_color != color:
+            continue
+        for trick_player, card in trick[1:]:
+            if card in context.trumps or card.card_color != color:
+                void.add(trick_player)
+    return void
+
+
 def _trick_secured(
     strongest: Card,
     yet_to_act: list[Player],
     unseen_cards: list[Card],
-    trumps: list[Card],
-    card_power_calculator: CardPowerCalculator,
-    void_of_trumps: set[Player],
+    context: CardPlayContext,
 ) -> bool:
-    """Whether nobody still to act in this trick can beat ``strongest``.
+    """Whether nobody in ``yet_to_act`` can beat ``strongest``.
 
-    Sharper than _is_highest_remaining alone: an unseen higher trump
-    cannot win this trick when every player still to act is known to be
-    void of trumps - e.g. the trumpless Hochzeit chooser, or anyone who
-    failed to follow a trump lead earlier.
+    Combines the cards that are still unseen with what the players still
+    to act are proven unable to hold: trump-void players (Trumpfzwang, or
+    the trumpless Hochzeit chooser) cannot overtrump, and suit-void
+    players (Farbzwang) cannot beat a suit card with a higher one.
     """
 
-    if _is_highest_remaining(strongest, unseen_cards, trumps, card_power_calculator):
-        return True
+    trumps = context.trumps
+    cpc = context.card_power_calculator
+    card_power = cpc.get_card_power(strongest)
+    void_of_trumps = _players_void_of_trumps(context)
 
-    if not all(player in void_of_trumps for player in yet_to_act):
-        return False
-
-    # Nobody still to act holds a trump, so only a higher card of the led
-    # suit could still win - impossible if ``strongest`` is itself a trump.
     if strongest in trumps:
-        return True
+        higher_trump_unseen = any(
+            unseen in trumps and cpc.get_card_power(unseen) > card_power
+            for unseen in unseen_cards
+        )
+        return not higher_trump_unseen or all(
+            player in void_of_trumps for player in yet_to_act
+        )
 
-    card_power = card_power_calculator.get_card_power(strongest)
-    return not any(
+    trump_unseen = any(unseen in trumps for unseen in unseen_cards)
+    higher_suit_card_unseen = any(
         unseen not in trumps
         and unseen.card_color == strongest.card_color
-        and card_power_calculator.get_card_power(unseen) > card_power
+        and cpc.get_card_power(unseen) > card_power
         for unseen in unseen_cards
+    )
+    void_of_suit = _players_void_of_suit(context, strongest.card_color)
+    return all(
+        (not trump_unseen or player in void_of_trumps)
+        and (not higher_suit_card_unseen or player in void_of_suit)
+        for player in yet_to_act
     )
 
 
@@ -313,19 +338,13 @@ def _choose_lead_card(
     ):
         # Every possible opponent is known to hold no trumps (the Hochzeit
         # chooser after the swap, or proven via Trumpfzwang) - any trump,
-        # and any card that is the highest of its suit still out, can only
-        # be overtaken by a teammate. Cash the most valuable sure winner
-        # (the weakest one on equal points).
+        # and any card no opponent can beat with a higher suit card, can
+        # only be overtaken by a teammate. Cash the most valuable sure
+        # winner (the weakest one on equal points).
         sure_winners = [
             card
             for card in legal_cards
-            if card in trumps
-            or not any(
-                unseen_card not in trumps
-                and unseen_card.card_color == card.card_color
-                and cpc.get_card_power(unseen_card) > cpc.get_card_power(card)
-                for unseen_card in unseen
-            )
+            if _trick_secured(card, threats, unseen, context)
         ]
         if sure_winners:
             return max(
@@ -419,6 +438,20 @@ def _choose_follow_card(
     ]
     losing_cards = [card for card in legal_cards if card not in winning_cards]
 
+    unseen = _remaining_unseen_cards(
+        own_hand=player.player_cards,
+        played_cards_history=context.played_cards_history,
+        current_trick_cards=cards_so_far,
+    )
+    team_knowledge = context.team_knowledge
+    yet_to_act = [
+        other
+        for other in (
+            team_knowledge.teammates + team_knowledge.opponents + team_knowledge.unknown
+        )
+        if other not in players_so_far
+    ]
+
     if _call_sau_owner_forced_this_trick(context, current_trick[0][1]):
         call_sau = context.call_sau
         has_called_suit = any(
@@ -436,11 +469,6 @@ def _choose_follow_card(
     is_teammate_winning = winner_player in context.team_knowledge.teammates
 
     if context.is_tout:
-        unseen = _remaining_unseen_cards(
-            own_hand=player.player_cards,
-            played_cards_history=context.played_cards_history,
-            current_trick_cards=cards_so_far,
-        )
         guaranteed_winners = [
             card
             for card in winning_cards
@@ -519,28 +547,11 @@ def _choose_follow_card(
             # The trick is already ours - no need to spend a strong card.
             return _safe_low_card(legal_cards, trumps, cpc)
 
-        unseen = _remaining_unseen_cards(
-            own_hand=player.player_cards,
-            played_cards_history=context.played_cards_history,
-            current_trick_cards=cards_so_far,
-        )
-        team_knowledge = context.team_knowledge
-        yet_to_act = [
-            other
-            for other in (
-                team_knowledge.teammates
-                + team_knowledge.opponents
-                + team_knowledge.unknown
-            )
-            if other not in players_so_far
-        ]
         secured = _trick_secured(
             strongest=strongest,
             yet_to_act=yet_to_act,
             unseen_cards=unseen,
-            trumps=trumps,
-            card_power_calculator=cpc,
-            void_of_trumps=_players_void_of_trumps(context),
+            context=context,
         )
         if secured or is_last_to_act:
             # Schmieren: feed our teammate's winning trick as many points
@@ -573,6 +584,17 @@ def _choose_follow_card(
             or trick_points_so_far >= cheapest.card_type.points
         )
         if worth_it:
+            if trick_points_so_far >= _HIGH_VALUE_THRESHOLD:
+                # A fat trick is worth taking with a card nobody still to
+                # act can overtake, rather than gambling the cheapest
+                # winner (and its points) away.
+                secure_winners = [
+                    card
+                    for card in winning_cards
+                    if _trick_secured(card, yet_to_act, unseen, context)
+                ]
+                if secure_winners:
+                    return min(secure_winners, key=cpc.get_card_power)
             return cheapest
         if losing_cards:
             return _safe_low_card(losing_cards, trumps, cpc)
