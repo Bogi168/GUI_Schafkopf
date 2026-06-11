@@ -75,7 +75,11 @@ class Sauspiel(Game):
         :type amount_game_value_doubles: int
         """
 
-        call_sau = Card(card_color=sau_color, card_type=Type.SAU)
+        call_sau = next(
+            card
+            for card in cards.full_deck
+            if card.card_color == sau_color and card.card_type == Type.SAU
+        )
 
         super().__init__(
             cards=cards,
