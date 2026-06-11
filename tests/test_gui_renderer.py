@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
@@ -6,11 +7,18 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 import pytest
 
 from card_classes.Cards import Color
+from game_classes.game_modes.Sauspiel import Sauspiel
+from game_classes.game_modes.Wenz import Wenz
 from system.gui import constants as c
 from system.gui.renderer import GUIRenderer
 from system.gui.state import DealAnimation, PlayedCardEntry
-from system.Renderer import GameResult
-from system.text import no_game_phrase
+from system.Renderer import ColorChoiceKind, GameResult, YesNoKind
+from system.text import (
+    no_game_phrase,
+    prompt_ask_for_hochzeit,
+    prompt_ask_for_ramsch,
+    prompt_ask_player_shoots,
+)
 
 
 @pytest.fixture
@@ -384,3 +392,227 @@ def test_main_loop_exits_after_farewell(renderer, monkeypatch):
 
     with pytest.raises(SystemExit):
         renderer._main_loop()
+
+
+# ---------------------------------------------------------------------------
+# ask_* methods
+# ---------------------------------------------------------------------------
+
+
+def test_ask_player_name_requests_name(renderer, monkeypatch):
+    captured = {}
+
+    def fake_request(**kwargs):
+        captured.update(kwargs)
+        return "Daniel"
+
+    monkeypatch.setattr(renderer, "_request", fake_request)
+
+    result = renderer.ask_player_name()
+
+    assert result == "Daniel"
+    assert captured == {"kind": "player_name", "title": "Enter your name"}
+
+
+def test_ask_yes_no_allow_yes_offers_both_options(renderer, player_2, monkeypatch):
+    captured = {}
+
+    def fake_request(**kwargs):
+        captured.update(kwargs)
+        return True
+
+    monkeypatch.setattr(renderer, "_request", fake_request)
+
+    result = renderer.ask_yes_no(player=player_2, kind=YesNoKind.SHOOT)
+
+    assert result is True
+    assert captured["kind"] == "yes_no"
+    assert captured["player_name"] == player_2.player_name
+    assert captured["title"] == prompt_ask_player_shoots(player_2.player_name)
+    assert captured["options"] == [("Yes", True), ("No", False)]
+
+
+def test_ask_yes_no_disallow_yes_offers_only_no(renderer, player_2, monkeypatch):
+    captured = {}
+
+    def fake_request(**kwargs):
+        captured.update(kwargs)
+        return False
+
+    monkeypatch.setattr(renderer, "_request", fake_request)
+
+    result = renderer.ask_yes_no(
+        player=player_2, kind=YesNoKind.HOCHZEIT, allow_yes=False
+    )
+
+    assert result is False
+    assert captured["title"] == prompt_ask_for_hochzeit(player_2.player_name)
+    assert captured["options"] == [("No", False)]
+
+
+def test_ask_game_mode_without_quitting_lists_options_only(
+    renderer, player_2, monkeypatch
+):
+    captured = {}
+
+    def fake_request(**kwargs):
+        captured.update(kwargs)
+        return Sauspiel
+
+    monkeypatch.setattr(renderer, "_request", fake_request)
+
+    options = {"1": Sauspiel, "2": Wenz}
+    result = renderer.ask_game_mode(player=player_2, options=options, quitting_possible=False)
+
+    assert result is Sauspiel
+    assert captured["kind"] == "game_mode"
+    assert captured["player_name"] == player_2.player_name
+    assert captured["title"] == f"{player_2.player_name}: Which game do you want to choose?"
+    assert captured["options"] == [("Sauspiel", Sauspiel), ("Wenz", Wenz)]
+
+
+def test_ask_game_mode_with_quitting_appends_skip_option(renderer, player_2, monkeypatch):
+    captured = {}
+
+    def fake_request(**kwargs):
+        captured.update(kwargs)
+        return None
+
+    monkeypatch.setattr(renderer, "_request", fake_request)
+
+    options = {"1": Sauspiel}
+    result = renderer.ask_game_mode(player=player_2, options=options, quitting_possible=True)
+
+    assert result is None
+    assert captured["options"] == [("Sauspiel", Sauspiel), ("Skip", None)]
+
+
+def test_ask_color_sau_kind_uses_sau_wording(renderer, player_2, monkeypatch):
+    captured = {}
+
+    def fake_request(**kwargs):
+        captured.update(kwargs)
+        return Color.EICHEL
+
+    monkeypatch.setattr(renderer, "_request", fake_request)
+
+    options = {"1": Color.EICHEL, "2": Color.GRUEN}
+    result = renderer.ask_color(player=player_2, options=options, kind=ColorChoiceKind.SAU)
+
+    assert result == Color.EICHEL
+    assert captured["kind"] == "color"
+    assert captured["title"] == f"{player_2.player_name}: Which Sau color do you want to play?"
+    assert captured["options"] == [("Eichel", Color.EICHEL), ("Grün", Color.GRUEN)]
+
+
+def test_ask_color_trump_kind_uses_trump_wording(renderer, player_2, monkeypatch):
+    captured = {}
+
+    def fake_request(**kwargs):
+        captured.update(kwargs)
+        return Color.HERZ
+
+    monkeypatch.setattr(renderer, "_request", fake_request)
+
+    options = {"1": Color.HERZ}
+    result = renderer.ask_color(player=player_2, options=options, kind=ColorChoiceKind.TRUMP)
+
+    assert result == Color.HERZ
+    assert captured["title"] == f"{player_2.player_name}: Which trump color do you want to play?"
+
+
+def test_ask_card_to_play_uses_play_title_and_copies_legal_mask(renderer, player_2, monkeypatch):
+    captured = {}
+
+    def fake_request(**kwargs):
+        captured.update(kwargs)
+        return 0
+
+    monkeypatch.setattr(renderer, "_request", fake_request)
+
+    legal_mask = [True, False, True]
+    result = renderer.ask_card(player=player_2, player_cards=[], legal_mask=legal_mask)
+
+    assert result == 0
+    assert captured["kind"] == "card"
+    assert captured["title"] == "Choose a card to play"
+    assert captured["legal_mask"] == legal_mask
+    assert captured["legal_mask"] is not legal_mask
+    assert captured["is_swap"] is False
+
+
+def test_ask_card_to_swap_uses_swap_title(renderer, player_2, monkeypatch):
+    captured = {}
+
+    def fake_request(**kwargs):
+        captured.update(kwargs)
+        return 1
+
+    monkeypatch.setattr(renderer, "_request", fake_request)
+
+    result = renderer.ask_card(
+        player=player_2, player_cards=[], legal_mask=[True], is_swap=True
+    )
+
+    assert result == 1
+    assert captured["title"] == "Choose a card to swap"
+    assert captured["is_swap"] is True
+
+
+# ---------------------------------------------------------------------------
+# _request / _submit threading round trip
+# ---------------------------------------------------------------------------
+
+
+def test_request_submit_round_trip_unblocks_ask_yes_no(renderer, player_2):
+    result_holder: dict = {}
+
+    def ask():
+        result_holder["value"] = renderer.ask_yes_no(player=player_2, kind=YesNoKind.RAMSCH)
+
+    thread = threading.Thread(target=ask)
+    thread.start()
+
+    deadline = time.time() + 2
+    while renderer.state.pending is None and time.time() < deadline:
+        time.sleep(0.01)
+
+    assert renderer.state.pending is not None
+    assert renderer.state.pending.kind == "yes_no"
+    assert renderer.state.pending.title == prompt_ask_for_ramsch(player_2.player_name)
+
+    renderer._submit(True)
+    thread.join(timeout=2)
+
+    assert not thread.is_alive()
+    assert result_holder["value"] is True
+    assert renderer.state.pending is None
+
+
+# ---------------------------------------------------------------------------
+# _wrap_text
+# ---------------------------------------------------------------------------
+
+
+def test_wrap_text_returns_single_line_when_it_fits(renderer):
+    lines = renderer._wrap_text("Short text", renderer.fonts.heading, 400)
+
+    assert lines == ["Short text"]
+
+
+def test_wrap_text_wraps_long_text_into_multiple_lines(renderer):
+    text = "one two three four five six seven eight"
+    max_width = renderer.fonts.heading.size("one two three")[0]
+
+    lines = renderer._wrap_text(text, renderer.fonts.heading, max_width)
+
+    assert len(lines) > 1
+    assert " ".join(lines) == text
+    for line in lines:
+        assert renderer.fonts.heading.size(line)[0] <= max_width
+
+
+def test_wrap_text_empty_string_returns_single_empty_line(renderer):
+    lines = renderer._wrap_text("", renderer.fonts.heading, 100)
+
+    assert lines == [""]
