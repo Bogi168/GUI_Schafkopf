@@ -55,7 +55,7 @@ _YES_NO_PROMPTS: dict[YesNoKind, Callable[[str], str]] = {
 }
 
 _CHOICE_ANNOUNCEMENT_DELAY = 1.6
-_FAREWELL_DELAY = 5.0
+_FAREWELL_DELAY = 8.0
 
 _FAREWELL_SUITS = [Color.EICHEL, Color.GRUEN, Color.HERZ, Color.SCHELLEN]
 
