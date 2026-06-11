@@ -45,7 +45,7 @@ After completing any meaningful unit of work — a bug fix, a new feature, a ref
 
 ## Architecture
 
-The game is orchestrated by `schafkopf_classes/Schafkopf.py`, which owns the main loop, deals cards, collects game-mode choices, and fires `game.play_game()`. One human `Player` and three `Bot` instances are created at startup; the `Bot` subclass overrides only the card-playing, shooting, and doubling decisions — game-mode selection methods are **not** overridden and currently fall through to the human prompts (a known gap).
+The game is orchestrated by `schafkopf_classes/Schafkopf.py`, which owns the main loop, deals cards, collects game-mode choices, and fires `game.play_game()`. One human `Player` and three `Bot` instances are created at startup; the `Bot` subclass overrides every decision method with heuristics from `player_classes/bot_strategy.py` (game choosing, mode/color selection, Hochzeit partnering and swap, shooting, doubling) and `player_classes/card_play_strategy.py` (card play).
 
 ### Game mode system
 
