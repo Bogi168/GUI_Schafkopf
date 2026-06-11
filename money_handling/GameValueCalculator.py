@@ -68,6 +68,38 @@ class GameValueCalculator(ABC):
         winning_team = self.player_teams[self.winners[0]]
         return winning_team.points == self.black_threshold
 
+    def _add_runners(self, game_value: int) -> int:
+        return game_value + self.runners_amount * self.base_price
+
+    def _apply_doubles(self, game_value: int) -> int:
+        for _ in range(self.amount_game_value_doubles):
+            game_value *= 2
+        return game_value
+
+    def _runners_breakdown_lines(self) -> list[str]:
+        if not self.runners_amount:
+            return []
+        return [f"{"Runners:":<11} + {self.runners_amount * self.base_price} cents"]
+
+    def _doubles_breakdown_lines(self) -> list[str]:
+        if not self.amount_game_value_doubles:
+            return []
+        return [f"{"Doubles:":<11} * {2 ** self.amount_game_value_doubles}"]
+
+    def _basic_game_value_adds_breakdown(self) -> list[str]:
+        """The schneider/black/runners/doubles lines added by
+        basic_game_value_adds, shared by every game_value_breakdown that
+        uses it."""
+
+        lines: list[str] = []
+        if self.is_schneider():
+            lines.append(f"{"Schneider:":<11} + {self.base_price} cents")
+        if self.is_black():
+            lines.append(f"{"Black:":<11} + {self.base_price} cents")
+        lines.extend(self._runners_breakdown_lines())
+        lines.extend(self._doubles_breakdown_lines())
+        return lines
+
     def basic_game_value_adds(self, game_value: int) -> int:
         """
         Adds runners, schneider and black values to the given game value if needed
@@ -78,7 +110,7 @@ class GameValueCalculator(ABC):
         :rtype: int
         """
 
-        game_value += self.runners_amount * self.base_price
+        game_value = self._add_runners(game_value)
 
         if self.is_schneider():
             game_value += self.base_price
@@ -86,10 +118,7 @@ class GameValueCalculator(ABC):
         if self.is_black():
             game_value += self.base_price
 
-        for _ in range(self.amount_game_value_doubles):
-            game_value *= 2
-
-        return game_value
+        return self._apply_doubles(game_value)
 
     @abstractmethod
     def calculate_game_value(self) -> int:
@@ -194,16 +223,7 @@ class SauspielGameValueCalculator(GameValueCalculator):
 
     def game_value_breakdown(self) -> str:
         lines: list[str] = [f"\n{"Call price:":<11} {self.call_price} cents"]
-        if self.is_schneider():
-            lines.append(f"{"Schneider:":<11} + {self.base_price} cents")
-        if self.is_black():
-            lines.append(f"{"Black:":<11} + {self.base_price} cents")
-        if self.runners_amount:
-            lines.append(
-                f"{"Runners:":<11} + {self.runners_amount * self.base_price} cents"
-            )
-        if self.amount_game_value_doubles:
-            lines.append(f"{"Doubles:":<11} * {2 ** self.amount_game_value_doubles}")
+        lines.extend(self._basic_game_value_adds_breakdown())
         return "\n".join(lines)
 
 
@@ -239,16 +259,7 @@ class AloneGameValueCalculator(GameValueCalculator):
 
     def game_value_breakdown(self) -> str:
         lines: list[str] = [f"\n{"Alone price:":<11} {self.alone_price} cents"]
-        if self.is_schneider():
-            lines.append(f"{"Schneider:":<11} + {self.base_price} cents")
-        if self.is_black():
-            lines.append(f"{"Black:":<11} + {self.base_price} cents")
-        if self.runners_amount:
-            lines.append(
-                f"{"Runners:":<11} + {self.runners_amount * self.base_price} cents"
-            )
-        if self.amount_game_value_doubles:
-            lines.append(f"{"Doubles:":<11} * {2 ** self.amount_game_value_doubles}")
+        lines.extend(self._basic_game_value_adds_breakdown())
         return "\n".join(lines)
 
 
@@ -289,20 +300,14 @@ class ToutGameValueCalculator(AloneGameValueCalculator):
 
     def basic_game_value_adds(self, game_value: int) -> int:
         # Tout doesn't have schneider or black, but the game value is doubled
-        game_value += self.runners_amount * self.base_price
-        for _ in range(self.amount_game_value_doubles):
-            game_value *= 2
-        game_value *= 2
-        return game_value
+        game_value = self._add_runners(game_value)
+        game_value = self._apply_doubles(game_value)
+        return game_value * 2
 
     def game_value_breakdown(self) -> str:
         lines: list[str] = [f"\n{"Alone price:":<11} {self.alone_price} cents"]
-        if self.runners_amount:
-            lines.append(
-                f"{"Runners:":<11} + {self.runners_amount * self.base_price} cents"
-            )
-        if self.amount_game_value_doubles:
-            lines.append(f"{"Doubles:":<11} * {2 ** self.amount_game_value_doubles}")
+        lines.extend(self._runners_breakdown_lines())
+        lines.extend(self._doubles_breakdown_lines())
         lines.append(f"{"Tout:":<11} * 2")
         return "\n".join(lines)
 
