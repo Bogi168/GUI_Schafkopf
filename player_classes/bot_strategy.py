@@ -50,10 +50,11 @@ _RAMSCH_HERZ_TRUMP_RISK = 1.0
 _RAMSCH_BLANC_SAU_RISK = 2.0
 _RAMSCH_BLANC_TEN_RISK = 1.0
 
-# Roughly the expected risk of a random 8-card hand (about one Ober, one
-# Unter and one and a half Herz trumps). A hand riskier than this is more
-# likely than not to rake in the most points, so the bot prefers to redraw.
-_RAMSCH_RISK_THRESHOLD = 7.0
+# A random 8-card hand carries about one Ober, one Unter and one and a half
+# Herz trumps - around 6.0 risk - which is already too dangerous to want a
+# Ramsch. Only a hand clearly safer than that average should volunteer, so
+# the threshold sits below it.
+_RAMSCH_RISK_THRESHOLD = 5.0
 
 _NON_TRUMP_COLORS = (Color.EICHEL, Color.GRUEN, Color.SCHELLEN)
 

@@ -187,40 +187,40 @@ def test_wants_to_play_ramsch_true_for_blanc_sau_alone(
 
 
 def test_wants_to_play_ramsch_false_when_blanc_sau_tips_a_trumpy_hand(
-    herz_ober,
     eichel_unter,
     herz_sau,
-    schellen_sau,
-    eichel_koenig,
-    eichel_nine,
+    herz_koenig,
     gruen_seven,
     gruen_eight,
-    schellen_seven,
+    gruen_nine,
+    gruen_koenig,
+    gruen_ten,
+    schellen_sau,
 ):
-    # 1 Ober + 1 Unter + 1 Herz trump alone is risky but still acceptable...
+    # 1 Unter + 2 Herz trumps alone is risky but still acceptable...
     moderate_trumps = [
-        herz_ober,
         eichel_unter,
         herz_sau,
-        schellen_seven,
-        eichel_koenig,
-        eichel_nine,
+        herz_koenig,
         gruen_seven,
         gruen_eight,
+        gruen_nine,
+        gruen_koenig,
+        gruen_ten,
     ]
     assert wants_to_play_ramsch(moderate_trumps) is True
 
-    # ...but swapping the harmless blanc Schellen Sieben for a blanc
-    # Schellen Sau tips the same hand into "no".
+    # ...but swapping the harmless Gruen Zehn for a blanc Schellen Sau
+    # tips the same hand into "no".
     with_blanc_sau = [
-        herz_ober,
         eichel_unter,
         herz_sau,
-        schellen_sau,
-        eichel_koenig,
-        eichel_nine,
+        herz_koenig,
         gruen_seven,
         gruen_eight,
+        gruen_nine,
+        gruen_koenig,
+        schellen_sau,
     ]
     assert wants_to_play_ramsch(with_blanc_sau) is False
 
