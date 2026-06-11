@@ -22,6 +22,7 @@ from system.text import (
     show_played_card,
     show_collector_of_cards,
     tell_chosen_game_mode,
+    tell_player_doubles_game_value,
     tell_player_wants_to_play,
     tell_player_chose_game_mode,
     tell_game_mode_announcement,
@@ -120,6 +121,10 @@ class Renderer(ABC):
 
     @abstractmethod
     def render_want_to_play_decision(self, player: Player, wants_to_play: bool) -> None:
+        pass
+
+    @abstractmethod
+    def render_double_game_value_decision(self, player: Player, doubles: bool) -> None:
         pass
 
     @abstractmethod
@@ -251,6 +256,10 @@ class ConsoleRenderer(Renderer):
                 player_name=player.player_name, wants_to_play=wants_to_play
             )
         )
+
+    def render_double_game_value_decision(self, player: Player, doubles: bool) -> None:
+        if doubles:
+            print(tell_player_doubles_game_value(player_name=player.player_name))
 
     def render_game_mode_decision(self, player: Player, game_mode: type[Game] | None) -> None:
         print(

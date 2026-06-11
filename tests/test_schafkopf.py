@@ -43,6 +43,24 @@ def test_prepare_cards_deals_eight_cards_per_player(schafkopf):
         assert len(player.player_cards) == 8
 
 
+def test_prepare_cards_announces_double_game_value_decisions(schafkopf, monkeypatch):
+    renderer = schafkopf.renderer
+    starter, bot1, bot2, bot3 = schafkopf.players
+
+    monkeypatch.setattr(bot1, "ask_double_game_value", lambda: True)
+    monkeypatch.setattr(bot2, "ask_double_game_value", lambda: False)
+    monkeypatch.setattr(bot3, "ask_double_game_value", lambda: False)
+
+    schafkopf.prepare_cards()
+
+    decisions = {
+        call.kwargs["player"]: call.kwargs["doubles"]
+        for call in renderer.render_double_game_value_decision.call_args_list
+    }
+    assert decisions == {starter: False, bot1: True, bot2: False, bot3: False}
+    assert schafkopf.amount_game_value_doubles == 1
+
+
 def test_prepare_cards_animates_shuffle_then_two_deals_in_turn_order(schafkopf):
     renderer = schafkopf.renderer
     players_in_turn_order = list(schafkopf.players)

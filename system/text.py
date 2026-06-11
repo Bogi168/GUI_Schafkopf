@@ -84,6 +84,10 @@ def tell_player_wants_to_play(player_name: str, wants_to_play: bool) -> str:
         return f"{player_name} does not want to play."
 
 
+def tell_player_doubles_game_value(player_name: str) -> str:
+    return f"{player_name} doubles the game value!"
+
+
 def tell_player_chose_game_mode(player_name: str, game_mode: type[Game] | None) -> str:
     if game_mode is None:
         return f"{player_name} passes."

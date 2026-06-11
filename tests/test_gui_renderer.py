@@ -128,6 +128,24 @@ def test_render_want_to_play_decision_ignores_human_seat(renderer, player_1):
     assert c.BOTTOM not in renderer.state.game_choice_lamps
 
 
+def test_render_double_game_value_decision_announces_when_doubling(renderer, player_2):
+    calls = []
+    renderer._announce_choice = lambda *args, **kwargs: calls.append((args, kwargs))
+
+    renderer.render_double_game_value_decision(player=player_2, doubles=True)
+
+    assert calls == [(("Testplayer 2 doubles the game value!",), {})]
+
+
+def test_render_double_game_value_decision_silent_when_not_doubling(renderer, player_2):
+    calls = []
+    renderer._announce_choice = lambda *args, **kwargs: calls.append((args, kwargs))
+
+    renderer.render_double_game_value_decision(player=player_2, doubles=False)
+
+    assert calls == []
+
+
 def test_render_game_mode_with_game_hides_lamps(renderer):
     renderer.render_game_mode(game_mode_name=None, chooser=None)
 

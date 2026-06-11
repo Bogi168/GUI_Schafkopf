@@ -1,4 +1,4 @@
-from system.text import tell_game_mode_announcement
+from system.text import tell_game_mode_announcement, tell_player_doubles_game_value
 from system.Renderer import ConsoleRenderer
 
 
@@ -52,3 +52,28 @@ def test_console_renderer_render_farewell(capsys):
 
     captured = capsys.readouterr()
     assert captured.out.strip() == "Thank you for playing!"
+
+
+def test_tell_player_doubles_game_value():
+    assert (
+        tell_player_doubles_game_value(player_name="Daniel")
+        == "Daniel doubles the game value!"
+    )
+
+
+def test_console_renderer_announces_double_game_value(capsys, player_1):
+    renderer = ConsoleRenderer()
+
+    renderer.render_double_game_value_decision(player=player_1, doubles=True)
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "Testplayer 1 doubles the game value!"
+
+
+def test_console_renderer_does_not_announce_when_not_doubling(capsys, player_1):
+    renderer = ConsoleRenderer()
+
+    renderer.render_double_game_value_decision(player=player_1, doubles=False)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""

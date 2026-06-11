@@ -110,7 +110,9 @@ class Schafkopf:
         )
         self.amount_game_value_doubles = 0
         for player in self.players:
-            if player.ask_double_game_value():
+            doubles = player.ask_double_game_value()
+            self.renderer.render_double_game_value_decision(player=player, doubles=doubles)
+            if doubles:
                 self.amount_game_value_doubles += 1
         self.deal_cards(cards_amount_per_player=cards_per_player_per_dealing_round)
         self.sort_player_hands()
