@@ -195,6 +195,19 @@ class GUIRenderer(Renderer):
                 with self.lock:
                     self.state.hand_sizes[seat] += 1
                     self.state.dealing_card = None
+                    if seat == c.BOTTOM:
+                        self._reveal_next_human_card(player)
+
+    def _reveal_next_human_card(self, player: Player) -> None:
+        """Reveals the next not-yet-shown card of the human's hand face up,
+        keeping the already-revealed cards in their final sorted order.
+        """
+
+        for card in player.player_cards:
+            if card not in self.state.human_hand:
+                self.state.human_hand.append(card)
+                break
+        self.state.human_hand.sort(key=player.player_cards.index)
 
     def render_hand(self, player: Player, cards: list[Card]) -> None:
         seat = self._ensure_seat(player)
@@ -578,20 +591,14 @@ class GUIRenderer(Renderer):
         self.screen.blit(name_surf, name_surf.get_rect(center=name_pos))
 
         cards = self.state.human_hand
-        # While cards are still being dealt, hand_sizes can be ahead of
-        # human_hand - draw those extra slots as face-down backs.
-        amount = max(len(cards), self.state.hand_sizes[c.BOTTOM])
-        rects = self._hand_card_rects(amount)
+        rects = self._hand_card_rects(len(cards))
         pending = self.state.pending
         legal_mask = pending.legal_mask if pending and pending.kind == "card" else None
-        for index, rect in enumerate(rects):
-            if index < len(cards):
-                dim = legal_mask is not None and not legal_mask[index]
-                draw_card_face(self.screen, rect, cards[index], self.fonts, dim=dim)
-            else:
-                draw_card_back(self.screen, rect)
+        for index, (card, rect) in enumerate(zip(cards, rects)):
+            dim = legal_mask is not None and not legal_mask[index]
+            draw_card_face(self.screen, rect, card, self.fonts, dim=dim)
         if legal_mask is not None:
-            self._current_card_rects = rects[: len(cards)]
+            self._current_card_rects = rects
 
     def _draw_center(self) -> None:
         for entry in self.state.center_cards:

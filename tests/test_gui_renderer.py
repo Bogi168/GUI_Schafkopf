@@ -221,6 +221,32 @@ def test_render_deal_cards_increments_hand_sizes_for_each_player(renderer, playe
     assert renderer.state.dealing_card is None
 
 
+def test_render_deal_cards_reveals_human_cards_face_up_immediately(
+    renderer, player_1, players, eichel_sau, gruen_sau, herz_sau, schellen_sau
+):
+    player_1.player_cards = [eichel_sau, gruen_sau, herz_sau, schellen_sau]
+
+    renderer.render_deal_cards(players=players, cards_per_player=4)
+
+    assert renderer.state.human_hand == player_1.player_cards
+    assert renderer.state.hand_sizes[c.BOTTOM] == 4
+
+
+def test_render_deal_cards_inserts_new_cards_in_sorted_order(
+    renderer, player_1, players, eichel_sau, gruen_sau, herz_sau, schellen_sau
+):
+    # Cards already revealed from a previous deal phase.
+    renderer.state.human_hand = [eichel_sau, gruen_sau]
+    renderer.state.hand_sizes[c.BOTTOM] = 2
+    # The freshly re-sorted full hand interleaves the two new cards.
+    player_1.player_cards = [herz_sau, eichel_sau, schellen_sau, gruen_sau]
+
+    renderer.render_deal_cards(players=players, cards_per_player=2)
+
+    assert renderer.state.human_hand == player_1.player_cards
+    assert renderer.state.hand_sizes[c.BOTTOM] == 4
+
+
 def test_draw_shuffle_is_noop_when_not_shuffling(renderer):
     renderer.state.shuffle_start_time = None
 
@@ -255,15 +281,6 @@ def test_deal_target_returns_seat_hand_positions(renderer):
 
     bottom_x, bottom_y = renderer._deal_target(c.BOTTOM)
     assert bottom_x == c.WINDOW_WIDTH // 2
-
-
-def test_draw_human_seat_shows_backs_for_undealt_hand_slots(
-    renderer, eichel_sau, gruen_sau
-):
-    renderer.state.human_hand = [eichel_sau, gruen_sau]
-    renderer.state.hand_sizes[c.BOTTOM] = 4
-
-    renderer._draw_human_seat()
 
 
 def test_draw_does_not_crash_during_dealing_animation(renderer):
