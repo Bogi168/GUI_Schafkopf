@@ -156,6 +156,17 @@ def _call_sau_safe_to_reveal(player: Player, context: CardPlayContext) -> bool:
     return all(opponent in void_of_trumps for opponent in opponents)
 
 
+def _call_sau_owner_forced_this_trick(context: CardPlayContext, lead_card: Card) -> bool:
+    """Whether Sau-Zwang guarantees the call sau's holder must still play it
+    on this trick - someone other than the holder led the called colour."""
+
+    call_sau = context.call_sau
+    if call_sau is None or call_sau in context.played_cards_history:
+        return False
+
+    return lead_card.card_color == call_sau.card_color and lead_card != call_sau
+
+
 def choose_card_to_play(
     player: Player, legal_cards: list[Card], context: CardPlayContext
 ) -> Card:
@@ -312,6 +323,20 @@ def _choose_follow_card(
     ]
     losing_cards = [card for card in legal_cards if card not in winning_cards]
 
+    if _call_sau_owner_forced_this_trick(context, current_trick[0][1]):
+        call_sau = context.call_sau
+        has_called_suit = any(
+            card.card_color == call_sau.card_color and card not in trumps
+            for card in player.player_cards
+        )
+        trump_winners = [card for card in winning_cards if card in trumps]
+        if not has_called_suit and trump_winners:
+            # The call sau's holder is forced to play it into this trick
+            # (Sau-Zwang) - we can't follow suit, so trump in now to claim
+            # those 11 points even though we can't be sure of overtaking
+            # whoever else still has to act.
+            return min(trump_winners, key=cpc.get_card_power)
+
     is_teammate_winning = winner_player in context.team_knowledge.teammates
 
     if context.is_tout:
@@ -336,6 +361,22 @@ def _choose_follow_card(
 
     if is_teammate_winning:
         if winning_cards:
+            if strongest not in trumps:
+                sau_of_suit = next(
+                    (
+                        card
+                        for card in winning_cards
+                        if card.card_color == strongest.card_color
+                        and card.card_type == Type.SAU
+                    ),
+                    None,
+                )
+                if sau_of_suit is not None:
+                    # Our teammate's non-trump card is winning, but a later
+                    # opponent could still overtake it with a higher card of
+                    # the same suit. Playing the Sau both secures the trick
+                    # and adds the most possible points for the team.
+                    return sau_of_suit
             # The trick is already ours - no need to spend a strong card.
             return _safe_low_card(legal_cards, trumps, cpc)
 
@@ -347,8 +388,14 @@ def _choose_follow_card(
         safe = _is_highest_remaining(strongest, unseen, trumps, cpc)
         if safe or is_last_to_act:
             # Schmieren: feed our teammate's winning trick as many points
-            # as possible.
-            return max(legal_cards, key=lambda card: card.card_type.points)
+            # as possible - but Ober/Unter are too valuable as trumps to
+            # give away just for their modest point value.
+            schmier_candidates = [
+                card for card in legal_cards if card.card_type not in cpc.trump_types
+            ]
+            if schmier_candidates:
+                return max(schmier_candidates, key=lambda card: card.card_type.points)
+            return _safe_low_card(legal_cards, trumps, cpc)
         # Too risky - an opponent could still overtake, don't feed points.
         return _safe_low_card(legal_cards, trumps, cpc)
 
@@ -357,7 +404,7 @@ def _choose_follow_card(
         cheapest = min(winning_cards, key=cpc.get_card_power)
         worth_it = (
             trick_points_so_far >= _HIGH_VALUE_THRESHOLD
-            or is_last_to_act
+            or (is_last_to_act and trick_points_so_far > 0)
             or trick_points_so_far >= cheapest.card_type.points
         )
         if worth_it:

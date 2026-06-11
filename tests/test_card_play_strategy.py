@@ -472,6 +472,43 @@ def test_follow_does_not_overtake_winning_teammate(
     assert result == eichel_seven
 
 
+def test_follow_overtaking_teammates_trump_uses_smallest_sufficient_trump(
+    schellen_unter, herz_unter, eichel_ober, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[herz_unter, eichel_ober])
+    context = _context(
+        current_trick=[("teammate", schellen_unter)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+    )
+
+    result = choose_card_to_play(player, [herz_unter, eichel_ober], context)
+
+    # Teammate's trump already wins the trick. Forced to follow with a
+    # trump, the smallest one that's still stronger than the teammate's
+    # card (Herz Unter) is the first trump above Schellen Unter - playing
+    # the strongest trump in hand (Eichel Ober) here wouldn't be ideal.
+    assert result == herz_unter
+
+
+def test_follow_extends_teammates_non_trump_lead_with_sau(
+    gruen_koenig, gruen_sau, gruen_seven, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[gruen_sau, gruen_seven])
+    context = _context(
+        current_trick=[("teammate", gruen_koenig)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+    )
+
+    result = choose_card_to_play(player, [gruen_sau, gruen_seven], context)
+
+    # Teammate's König already wins the trick, but a later opponent could
+    # still overtake it with the Gruen Zehn. Playing the Sau locks in the
+    # trick for the team and adds 11 points instead of 0.
+    assert result == gruen_sau
+
+
 def test_follow_schmiers_teammate_when_safe(
     eichel_ober, herz_sau, gruen_seven, sauspiel_trumps
 ):
@@ -521,6 +558,60 @@ def test_follow_schmiers_when_last_to_act_even_if_risky(
     assert result == herz_sau
 
 
+def test_follow_schmier_skips_unter_in_favour_of_lower_value_non_trump(
+    eichel_ober, schellen_unter, gruen_seven, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[schellen_unter, gruen_seven])
+    context = _context(
+        current_trick=[("teammate", eichel_ober)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+    )
+
+    result = choose_card_to_play(player, [schellen_unter, gruen_seven], context)
+
+    # Eichel Ober is unbeatable, so schmieren is safe - but Schellen Unter
+    # is too valuable a trump to give away for its 2 points, even though
+    # it's worth more than the 0-point Gruen Sieben.
+    assert result == gruen_seven
+
+
+def test_follow_schmier_falls_back_to_safe_low_card_when_only_trumps_legal(
+    eichel_ober, schellen_unter, herz_unter, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[schellen_unter, herz_unter])
+    context = _context(
+        current_trick=[("teammate", eichel_ober)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+    )
+
+    result = choose_card_to_play(player, [schellen_unter, herz_unter], context)
+
+    # Both legal cards are Unter - no non-trump-type card to schmier with,
+    # so fall back to the cheapest trump.
+    assert result == schellen_unter
+
+
+def test_follow_trumps_in_when_call_sau_owner_will_be_forced(
+    eichel_sau, eichel_seven, schellen_unter, gruen_seven, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[schellen_unter, gruen_seven])
+    context = _context(
+        current_trick=[("teammate", eichel_seven)],
+        trumps=sauspiel_trumps,
+        call_sau=eichel_sau,
+    )
+
+    result = choose_card_to_play(player, [schellen_unter, gruen_seven], context)
+
+    # Our team mate led a low Eichel, seeking the call sau. We're void of
+    # Eichel ourselves but hold a trump - the call sau's holder is now
+    # forced (Sau-Zwang) to play it into this trick, so trump in to claim
+    # those 11 points instead of ducking with junk from another suit.
+    assert result == schellen_unter
+
+
 # choose_card_to_play - following, opponent (or unknown) currently winning
 
 
@@ -566,6 +657,46 @@ def test_follow_dumps_junk_when_cannot_win(
     result = choose_card_to_play(player, [herz_sau, gruen_seven], context)
 
     assert result == gruen_seven
+
+
+def test_follow_last_to_act_does_not_spend_points_on_worthless_trick(
+    gruen_seven, gruen_eight, gruen_nine, gruen_ober, schellen_seven, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[gruen_ober, schellen_seven])
+    context = _context(
+        current_trick=[
+            ("opp1", gruen_seven),
+            ("opp2", gruen_eight),
+            ("opp3", gruen_nine),
+        ],
+        trumps=sauspiel_trumps,
+    )
+
+    result = choose_card_to_play(player, [gruen_ober, schellen_seven], context)
+
+    # Every card on the table is worth 0 points, so there's no must to win
+    # it with the Gruen Ober - keep the trump and let the opponent have the
+    # worthless trick.
+    assert result == schellen_seven
+
+
+def test_follow_last_to_act_takes_worthless_trick_with_a_zero_point_card(
+    gruen_seven, gruen_eight, gruen_nine, schellen_seven, schellen_eight, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[gruen_nine, schellen_eight])
+    context = _context(
+        current_trick=[
+            ("opp1", gruen_seven),
+            ("opp2", gruen_eight),
+            ("opp3", schellen_seven),
+        ],
+        trumps=sauspiel_trumps,
+    )
+
+    result = choose_card_to_play(player, [gruen_nine, schellen_eight], context)
+
+    # Taking a worthless trick with another worthless card is also fine.
+    assert result == gruen_nine
 
 
 # choose_card_to_play - Ramsch following
