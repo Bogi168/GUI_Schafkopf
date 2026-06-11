@@ -5,6 +5,7 @@ from player_classes.bot_strategy import (
     ramsch_risk,
     wants_to_double_game_value,
     wants_to_play_ramsch,
+    wants_to_shoot,
 )
 
 
@@ -324,3 +325,89 @@ def test_bot_ask_for_ramsch_delegates_to_wants_to_play_ramsch(
 
     assert _bot(safe_hand).ask_for_ramsch() is True
     assert _bot(risky_hand).ask_for_ramsch() is False
+
+
+def test_wants_to_shoot_true_with_majority_of_trumps(sauspiel_trumps):
+    # All 4 Ober + all 4 Unter = 8 of the 14 Sauspiel trumps - more than
+    # any other single player can hold.
+    hand = sauspiel_trumps[:8]
+
+    assert wants_to_shoot(hand, sauspiel_trumps) is True
+
+
+def test_wants_to_shoot_false_with_only_half_of_trumps(sauspiel_trumps, eichel_sau):
+    # 7 of the 14 trumps - exactly half is not a guaranteed majority.
+    hand = sauspiel_trumps[:7] + [eichel_sau]
+
+    assert wants_to_shoot(hand, sauspiel_trumps) is False
+
+
+def test_wants_to_shoot_true_with_majority_of_wenz_trumps(
+    wenz_trumps,
+    eichel_unter,
+    gruen_unter,
+    herz_unter,
+    eichel_sau,
+    gruen_sau,
+    schellen_sau,
+    eichel_koenig,
+    gruen_koenig,
+):
+    # 3 of the 4 Unter - the chooser can hold at most 1.
+    hand = [
+        eichel_unter,
+        gruen_unter,
+        herz_unter,
+        eichel_sau,
+        gruen_sau,
+        schellen_sau,
+        eichel_koenig,
+        gruen_koenig,
+    ]
+
+    assert wants_to_shoot(hand, wenz_trumps) is True
+
+
+def test_wants_to_shoot_false_with_half_of_wenz_trumps(
+    wenz_trumps,
+    eichel_unter,
+    gruen_unter,
+    eichel_sau,
+    gruen_sau,
+    schellen_sau,
+    eichel_koenig,
+    gruen_koenig,
+    schellen_koenig,
+):
+    # Only 2 of the 4 Unter - no guaranteed majority.
+    hand = [
+        eichel_unter,
+        gruen_unter,
+        eichel_sau,
+        gruen_sau,
+        schellen_sau,
+        eichel_koenig,
+        gruen_koenig,
+        schellen_koenig,
+    ]
+
+    assert wants_to_shoot(hand, wenz_trumps) is False
+
+
+def test_wants_to_shoot_false_without_trumps_information(sauspiel_trumps):
+    # Ramsch passes no trumps - shooting never applies there.
+    hand = sauspiel_trumps[:8]
+
+    assert wants_to_shoot(hand, []) is False
+
+
+def test_bot_ask_shoot_delegates_to_wants_to_shoot(sauspiel_trumps, eichel_sau):
+    strong_hand = sauspiel_trumps[:8]
+    weak_hand = sauspiel_trumps[:7] + [eichel_sau]
+
+    assert _bot(strong_hand).ask_shoot(trumps=sauspiel_trumps) is True
+    assert _bot(weak_hand).ask_shoot(trumps=sauspiel_trumps) is False
+
+
+def test_bot_ask_shoot_without_trumps_defaults_to_false(sauspiel_trumps):
+    assert _bot(sauspiel_trumps[:8]).ask_shoot() is False

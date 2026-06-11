@@ -203,6 +203,26 @@ def best_sau_color(player_cards: list[Card], options: dict[str, Color]) -> Color
     )
 
 
+def wants_to_shoot(player_cards: list[Card], trumps: list[Card]) -> bool:
+    """Decides whether a bot shoots (or shoots back), doubling the game
+    value and turning its own team into the active team for the rest of
+    the hand.
+
+    Shooting is a high-risk bet: it doubles the stakes for everyone, win
+    or lose, and the bot's hand alone has to be good enough to compensate
+    whatever team mate it ends up with. A bot only shoots if it holds a
+    strict majority of all trumps in this game mode - a guarantee that no
+    other player, including the game chooser, can hold more trumps than
+    it does. This is "incredibly good" and should happen very rarely.
+    """
+
+    if not trumps:
+        return False
+
+    trump_count = sum(1 for card in player_cards if card in trumps)
+    return trump_count > len(trumps) / 2
+
+
 def ramsch_risk(player_cards: list[Card]) -> float:
     """Estimates how likely a hand is to end up with the most points in a
     Ramsch.

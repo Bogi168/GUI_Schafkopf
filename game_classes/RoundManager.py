@@ -65,10 +65,10 @@ class RoundManager:
     def handle_shooting(self, players_team: Team, player: Player) -> bool:
         if self.active_team is None or players_team == self.active_team:
             return True
-        if player.ask_shoot():
+        if player.ask_shoot(trumps=self.trumps):
             self.amt_game_val_doubles += 1
             for prev_active_player in self.active_team.players:
-                if prev_active_player.ask_shoot(ask_shoot_back=True):
+                if prev_active_player.ask_shoot(ask_shoot_back=True, trumps=self.trumps):
                     self.amt_game_val_doubles += 1
                     break
             else:

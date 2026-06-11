@@ -9,6 +9,7 @@ from player_classes.bot_strategy import (
     wants_to_double_game_value,
     wants_to_play,
     wants_to_play_ramsch,
+    wants_to_shoot,
 )
 from player_classes.card_play_strategy import choose_card_to_play
 import random
@@ -167,12 +168,15 @@ class Player:
 
         return self.renderer.ask_yes_no(player=self, kind=YesNoKind.RAMSCH)
 
-    def ask_shoot(self, ask_shoot_back: bool = False) -> bool:
+    def ask_shoot(self, ask_shoot_back: bool = False, trumps: list[Card] | None = None) -> bool:
         """
         Asks the player whether he wants to shoot or not.
         By shooting, the player doubles the game value and his team turns to the active team.
         :param ask_shoot_back: If the player is asked to shoot back, it should be set to True
         :type ask_shoot_back: bool
+        :param trumps: The trumps of the current game mode, used by Bots to judge their hand.
+            Ignored by human players.
+        :type trumps: list[Card] | None
         :return: A boolean indicating whether the player wants to shoot or not
         :rtype: bool
         """
@@ -307,5 +311,5 @@ class Bot(Player):
         self.player_cards.remove(decision)
         return decision
 
-    def ask_shoot(self, ask_shoot_back: bool = False) -> bool:
-        return False
+    def ask_shoot(self, ask_shoot_back: bool = False, trumps: list[Card] | None = None) -> bool:
+        return wants_to_shoot(player_cards=self.player_cards, trumps=trumps or [])
