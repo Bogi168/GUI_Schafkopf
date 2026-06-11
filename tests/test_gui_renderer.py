@@ -1,4 +1,5 @@
 import os
+import time
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
@@ -7,7 +8,7 @@ import pytest
 from card_classes.Cards import Color
 from system.gui import constants as c
 from system.gui.renderer import GUIRenderer
-from system.gui.state import PlayedCardEntry
+from system.gui.state import DealAnimation, PlayedCardEntry
 from system.Renderer import GameResult
 from system.text import no_game_phrase
 
@@ -198,6 +199,80 @@ def test_render_farewell_shows_centered_announcement_and_requests_quit(renderer)
 
     assert renderer.state.choice_announcement == "Thank you for playing!"
     assert renderer._should_quit is True
+
+    renderer._draw((0, 0))
+
+
+def test_render_shuffle_cards_resets_hands_and_clears_afterwards(renderer, eichel_sau):
+    renderer.state.hand_sizes = [3, 4, 5, 6]
+    renderer.state.human_hand = [eichel_sau]
+
+    renderer.render_shuffle_cards()
+
+    assert renderer.state.hand_sizes == [0, 0, 0, 0]
+    assert renderer.state.human_hand == []
+    assert renderer.state.shuffle_start_time is None
+
+
+def test_render_deal_cards_increments_hand_sizes_for_each_player(renderer, players):
+    renderer.render_deal_cards(players=players, cards_per_player=4)
+
+    assert renderer.state.hand_sizes == [4, 4, 4, 4]
+    assert renderer.state.dealing_card is None
+
+
+def test_draw_shuffle_is_noop_when_not_shuffling(renderer):
+    renderer.state.shuffle_start_time = None
+
+    renderer._draw_shuffle()
+
+
+def test_draw_shuffle_does_not_crash_while_active(renderer):
+    renderer.state.shuffle_start_time = time.time()
+    renderer.state.shuffle_duration = 1.0
+
+    renderer._draw_shuffle()
+
+
+def test_draw_dealing_card_is_noop_when_not_dealing(renderer):
+    renderer.state.dealing_card = None
+
+    renderer._draw_dealing_card()
+
+
+def test_draw_dealing_card_does_not_crash_while_active(renderer):
+    renderer.state.dealing_card = DealAnimation(
+        seat=c.LEFT, start_time=time.time(), duration=0.12
+    )
+
+    renderer._draw_dealing_card()
+
+
+def test_deal_target_returns_seat_hand_positions(renderer):
+    assert renderer._deal_target(c.LEFT) == c.SEAT_HAND_CENTER[c.LEFT]
+    assert renderer._deal_target(c.TOP) == c.SEAT_HAND_CENTER[c.TOP]
+    assert renderer._deal_target(c.RIGHT) == c.SEAT_HAND_CENTER[c.RIGHT]
+
+    bottom_x, bottom_y = renderer._deal_target(c.BOTTOM)
+    assert bottom_x == c.WINDOW_WIDTH // 2
+
+
+def test_draw_human_seat_shows_backs_for_undealt_hand_slots(
+    renderer, eichel_sau, gruen_sau
+):
+    renderer.state.human_hand = [eichel_sau, gruen_sau]
+    renderer.state.hand_sizes[c.BOTTOM] = 4
+
+    renderer._draw_human_seat()
+
+
+def test_draw_does_not_crash_during_dealing_animation(renderer):
+    renderer.state.shuffle_start_time = time.time()
+    renderer.state.shuffle_duration = 1.0
+    renderer.state.dealing_card = DealAnimation(
+        seat=c.TOP, start_time=time.time(), duration=0.12
+    )
+    renderer.state.hand_sizes = [2, 1, 1, 1]
 
     renderer._draw((0, 0))
 

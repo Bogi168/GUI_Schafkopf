@@ -25,6 +25,15 @@ class PlayedCardEntry:
 
 
 @dataclass
+class DealAnimation:
+    """An in-flight card animation from the deck to a seat while dealing."""
+
+    seat: int
+    start_time: float
+    duration: float
+
+
+@dataclass
 class PendingRequest:
     """A blocking request for input from the human player."""
 
@@ -63,3 +72,8 @@ class TableState:
     game_choice_lamps: dict[int, str] = field(default_factory=dict)
     game_result: GameResult | None = None
     pending: PendingRequest | None = None
+    # Card-dealing animation state, written by render_shuffle_cards /
+    # render_deal_cards and read by the draw loop.
+    shuffle_start_time: float | None = None
+    shuffle_duration: float = 0.0
+    dealing_card: DealAnimation | None = None

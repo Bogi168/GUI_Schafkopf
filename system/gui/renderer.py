@@ -10,6 +10,7 @@ read-only `Player.money` attribute used for the live money display.
 
 from __future__ import annotations
 
+import math
 import os
 import random
 import threading
@@ -24,7 +25,7 @@ from system.Renderer import ColorChoiceKind, Renderer, YesNoKind
 from system.gui import constants as c
 from system.gui.bot_images import get_bot_image
 from system.gui.cards import draw_card_back, draw_card_face
-from system.gui.state import PendingRequest, PlayedCardEntry, TableState
+from system.gui.state import DealAnimation, PendingRequest, PlayedCardEntry, TableState
 from system.gui.suit_images import get_suit_image
 from system.gui.widgets import Button, TextInput
 from system.text import (
@@ -56,6 +57,8 @@ _YES_NO_PROMPTS: dict[YesNoKind, Callable[[str], str]] = {
 
 _CHOICE_ANNOUNCEMENT_DELAY = 1.6
 _FAREWELL_DELAY = 8.0
+_SHUFFLE_DURATION = 1.0
+_DEAL_CARD_DURATION = 0.12
 
 _FAREWELL_SUITS = [Color.EICHEL, Color.GRUEN, Color.HERZ, Color.SCHELLEN]
 
@@ -169,6 +172,29 @@ class GUIRenderer(Renderer):
         time.sleep(_FAREWELL_DELAY)
         with self.lock:
             self._should_quit = True
+
+    def render_shuffle_cards(self) -> None:
+        with self.lock:
+            self.state.hand_sizes = [0, 0, 0, 0]
+            self.state.human_hand = []
+            self.state.shuffle_start_time = time.time()
+            self.state.shuffle_duration = _SHUFFLE_DURATION
+        time.sleep(_SHUFFLE_DURATION)
+        with self.lock:
+            self.state.shuffle_start_time = None
+
+    def render_deal_cards(self, players: list[Player], cards_per_player: int) -> None:
+        for player in players:
+            seat = self._ensure_seat(player)
+            for _ in range(cards_per_player):
+                with self.lock:
+                    self.state.dealing_card = DealAnimation(
+                        seat=seat, start_time=time.time(), duration=_DEAL_CARD_DURATION
+                    )
+                time.sleep(_DEAL_CARD_DURATION)
+                with self.lock:
+                    self.state.hand_sizes[seat] += 1
+                    self.state.dealing_card = None
 
     def render_hand(self, player: Player, cards: list[Card]) -> None:
         seat = self._ensure_seat(player)
@@ -468,6 +494,8 @@ class GUIRenderer(Renderer):
             self._draw_bot_seat(c.RIGHT, mouse_pos)
             self._draw_human_seat()
             self._draw_center()
+            self._draw_shuffle()
+            self._draw_dealing_card()
             self._draw_game_mode_badge()
 
             if self.state.choice_announcement:
@@ -550,19 +578,65 @@ class GUIRenderer(Renderer):
         self.screen.blit(name_surf, name_surf.get_rect(center=name_pos))
 
         cards = self.state.human_hand
-        rects = self._hand_card_rects(len(cards))
+        # While cards are still being dealt, hand_sizes can be ahead of
+        # human_hand - draw those extra slots as face-down backs.
+        amount = max(len(cards), self.state.hand_sizes[c.BOTTOM])
+        rects = self._hand_card_rects(amount)
         pending = self.state.pending
         legal_mask = pending.legal_mask if pending and pending.kind == "card" else None
-        for index, (card, rect) in enumerate(zip(cards, rects)):
-            dim = legal_mask is not None and not legal_mask[index]
-            draw_card_face(self.screen, rect, card, self.fonts, dim=dim)
+        for index, rect in enumerate(rects):
+            if index < len(cards):
+                dim = legal_mask is not None and not legal_mask[index]
+                draw_card_face(self.screen, rect, cards[index], self.fonts, dim=dim)
+            else:
+                draw_card_back(self.screen, rect)
         if legal_mask is not None:
-            self._current_card_rects = rects
+            self._current_card_rects = rects[: len(cards)]
 
     def _draw_center(self) -> None:
         for entry in self.state.center_cards:
             rect = self._center_card_rect(entry.seat)
             draw_card_face(self.screen, rect, entry.card, self.fonts)
+
+    def _draw_shuffle(self) -> None:
+        start_time = self.state.shuffle_start_time
+        if start_time is None:
+            return
+        elapsed = time.time() - start_time
+        progress = min(1.0, elapsed / self.state.shuffle_duration)
+        amplitude = (1 - progress) * 36
+        width, height = c.BACK_CARD_SIZE
+        cx, cy = c.CENTER
+        num_cards = 8
+        for i in range(num_cards):
+            phase = i / num_cards
+            offset_x = math.sin(elapsed * 6 + phase * math.tau) * amplitude
+            rect = pygame.Rect(0, 0, width, height)
+            rect.center = (cx + offset_x, cy + i * 2 - num_cards)
+            draw_card_back(self.screen, rect)
+
+    def _draw_dealing_card(self) -> None:
+        dealing = self.state.dealing_card
+        if dealing is None:
+            return
+        progress = min(1.0, (time.time() - dealing.start_time) / dealing.duration)
+        eased = 1 - (1 - progress) ** 2
+        start_x, start_y = c.CENTER
+        end_x, end_y = self._deal_target(dealing.seat)
+        width, height = c.BACK_CARD_SIZE
+        rect = pygame.Rect(0, 0, width, height)
+        rect.center = (
+            start_x + (end_x - start_x) * eased,
+            start_y + (end_y - start_y) * eased,
+        )
+        draw_card_back(self.screen, rect)
+
+    @staticmethod
+    def _deal_target(seat: int) -> tuple[int, int]:
+        if seat == c.BOTTOM:
+            _, height = c.HAND_CARD_SIZE
+            return (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT - height // 2 - 20)
+        return c.SEAT_HAND_CENTER[seat]
 
     def _draw_game_mode_badge(self) -> None:
         game_mode = self.state.current_game_mode

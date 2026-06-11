@@ -81,6 +81,14 @@ class Renderer(ABC):
         pass
 
     @abstractmethod
+    def render_shuffle_cards(self) -> None:
+        pass
+
+    @abstractmethod
+    def render_deal_cards(self, players: list[Player], cards_per_player: int) -> None:
+        pass
+
+    @abstractmethod
     def render_hand(self, player: Player, cards: list[Card]) -> None:
         pass
 
@@ -198,6 +206,12 @@ class ConsoleRenderer(Renderer):
 
     def render_farewell(self, message: str) -> None:
         print(message.strip())
+
+    def render_shuffle_cards(self) -> None:
+        pass
+
+    def render_deal_cards(self, players: list[Player], cards_per_player: int) -> None:
+        pass
 
     def render_hand(self, player: Player, cards: list[Card]) -> None:
         print(show_player_cards(player_name=player.player_name, player_cards=cards))

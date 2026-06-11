@@ -101,14 +101,23 @@ class Schafkopf:
         cards_per_player_per_dealing_round = cards_per_dealing_round // len(
             self.players
         )
+        self.renderer.render_shuffle_cards()
         self.deal_cards(cards_amount_per_player=cards_per_player_per_dealing_round)
         self.sort_player_hands()
+        self.renderer.render_deal_cards(
+            players=self.players,
+            cards_per_player=cards_per_player_per_dealing_round,
+        )
         self.amount_game_value_doubles = 0
         for player in self.players:
             if player.ask_double_game_value():
                 self.amount_game_value_doubles += 1
         self.deal_cards(cards_amount_per_player=cards_per_player_per_dealing_round)
         self.sort_player_hands()
+        self.renderer.render_deal_cards(
+            players=self.players,
+            cards_per_player=cards_per_player_per_dealing_round,
+        )
 
     def prepare_players(self):
         assert self.starter is not None
