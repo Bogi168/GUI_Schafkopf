@@ -1333,3 +1333,92 @@ def test_lead_cashes_ten_when_threats_void_of_trumps_and_suit(
     result = choose_card_to_play(player, [gruen_ten, eichel_koenig], context)
 
     assert result == gruen_ten
+
+
+# Lead: exploiting proven suit voids
+
+
+def test_lead_avoids_suit_an_opponent_can_trump(
+    gruen_seven, gruen_eight, schellen_seven, schellen_eight, eichel_seven, sauspiel_trumps
+):
+    # "opponent" discarded Eichel on a Gruen lead - void of Gruen but not
+    # proven out of trumps. Leading Gruen would invite a trump stab, so
+    # lead the longer but safe Schellen suit instead.
+    player = _FakePlayer(player_cards=[gruen_seven, schellen_seven, schellen_eight])
+    trick_history = [[("teammate", gruen_eight), ("opponent", eichel_seven)]]
+    context = _context(
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opponent"],
+        trick_history=trick_history,
+        tricks_remaining=4,
+    )
+
+    result = choose_card_to_play(
+        player, [gruen_seven, schellen_seven, schellen_eight], context
+    )
+
+    assert result == schellen_seven
+
+
+def test_lead_prefers_suit_a_teammate_can_trump(
+    eichel_seven, eichel_eight, eichel_nine, gruen_seven, schellen_seven, sauspiel_trumps
+):
+    # "teammate" discarded Schellen on an Eichel lead - void of Eichel and
+    # possibly still holding trumps. Lead Eichel so they can trump in,
+    # even though Gruen is the shorter suit.
+    player = _FakePlayer(player_cards=[eichel_seven, eichel_eight, gruen_seven])
+    trick_history = [[("opponent", eichel_nine), ("teammate", schellen_seven)]]
+    context = _context(
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opponent"],
+        trick_history=trick_history,
+        tricks_remaining=4,
+    )
+
+    result = choose_card_to_play(
+        player, [eichel_seven, eichel_eight, gruen_seven], context
+    )
+
+    assert result == eichel_seven
+
+
+def test_lead_sau_skips_suit_an_opponent_can_trump(
+    gruen_sau, schellen_sau, schellen_seven, gruen_eight, eichel_seven, sauspiel_trumps
+):
+    # Early Sau lead: Gruen is the shorter suit, but "opponent" is proven
+    # void of Gruen and may still hold trumps - cash the Schellen Sau
+    # instead of feeding the Gruen Sau to a trump.
+    player = _FakePlayer(player_cards=[gruen_sau, schellen_sau, schellen_seven])
+    trick_history = [[("teammate", gruen_eight), ("opponent", eichel_seven)]]
+    context = _context(
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opponent"],
+        trick_history=trick_history,
+        tricks_remaining=7,
+    )
+
+    result = choose_card_to_play(
+        player, [gruen_sau, schellen_sau, schellen_seven], context
+    )
+
+    assert result == schellen_sau
+
+
+def test_follow_schmier_feeds_non_trump_ten_before_trump_ten(
+    eichel_ober, herz_ten, schellen_ten, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[herz_ten, schellen_ten])
+    context = _context(
+        current_trick=[("teammate", eichel_ober)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+    )
+
+    result = choose_card_to_play(player, [herz_ten, schellen_ten], context)
+
+    # Both Tens are worth 10 points, but the Herz Ten is a trump that can
+    # still win a trick later - feed the Schellen Ten instead.
+    assert result == schellen_ten

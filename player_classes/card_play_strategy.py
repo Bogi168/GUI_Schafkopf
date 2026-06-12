@@ -161,6 +161,32 @@ def _players_void_of_suit(context: CardPlayContext, color: Color) -> set[Player]
     return void
 
 
+def _threat_can_trump_suit(context: CardPlayContext, color: Color) -> bool:
+    """Whether an opponent (or a player of unknown allegiance) is proven
+    void of the non-trump suit ``color`` without being proven void of
+    trumps - leading that suit invites them to trump the trick away."""
+
+    threats = context.team_knowledge.opponents + context.team_knowledge.unknown
+    suit_void = _players_void_of_suit(context, color)
+    trump_void = _players_void_of_trumps(context)
+    return any(
+        threat in suit_void and threat not in trump_void for threat in threats
+    )
+
+
+def _teammate_can_trump_suit(context: CardPlayContext, color: Color) -> bool:
+    """Whether a known teammate is proven void of the non-trump suit
+    ``color`` while possibly still holding trumps - leading that suit
+    gives them the chance to trump in and win the trick."""
+
+    suit_void = _players_void_of_suit(context, color)
+    trump_void = _players_void_of_trumps(context)
+    return any(
+        teammate in suit_void and teammate not in trump_void
+        for teammate in context.team_knowledge.teammates
+    )
+
+
 def _trick_secured(
     strongest: Card,
     yet_to_act: list[Player],
@@ -390,21 +416,39 @@ def _choose_lead_card(
     if non_trump_legal:
         aces = [card for card in non_trump_legal if card.card_type == Type.SAU]
         if aces and context.tricks_remaining >= _EARLY_GAME_TRICKS:
-            # Early on, a Sau is unlikely to be trumped and is the highest
-            # card of its suit - lead the one from our shortest suit.
-            return min(
-                aces,
-                key=lambda card: _non_trump_suit_count(
-                    player.player_cards, card.card_color, trumps
-                ),
-            )
+            safe_aces = [
+                ace
+                for ace in aces
+                if not _threat_can_trump_suit(context, ace.card_color)
+            ]
+            if safe_aces:
+                # Early on, a Sau is unlikely to be trumped and is the
+                # highest card of its suit - lead the one from our shortest
+                # suit (skipping suits an opponent is proven able to trump).
+                return min(
+                    safe_aces,
+                    key=lambda card: _non_trump_suit_count(
+                        player.player_cards, card.card_color, trumps
+                    ),
+                )
 
         suit_counts = {
             color: _non_trump_suit_count(player.player_cards, color, trumps)
             for color in {card.card_color for card in non_trump_legal}
         }
-        shortest_suit = min(suit_counts, key=lambda color: suit_counts[color])
-        candidates = [card for card in non_trump_legal if card.card_color == shortest_suit]
+
+        def lead_suit_priority(color: Color) -> tuple[bool, bool, int]:
+            # Suits an opponent can trump away come last; suits a teammate
+            # can trump in on come first; otherwise prefer the shortest
+            # suit to work towards a void.
+            return (
+                _threat_can_trump_suit(context, color),
+                not _teammate_can_trump_suit(context, color),
+                suit_counts[color],
+            )
+
+        best_suit = min(suit_counts, key=lead_suit_priority)
+        candidates = [card for card in non_trump_legal if card.card_color == best_suit]
         return min(
             candidates,
             key=lambda card: (card.card_type.points, cpc.get_card_power(card)),
@@ -562,13 +606,14 @@ def _choose_follow_card(
             ]
             if schmier_candidates:
 
-                def schmier_priority(card: Card) -> float:
+                def schmier_priority(card: Card) -> tuple[float, bool]:
                     # Feed the Ten before the Sau: nearly the same points,
                     # but a non-trump Sau is the boss of its suit and may
-                    # still win a trick of its own later.
+                    # still win a trick of its own later. On equal value,
+                    # feed a non-trump rather than spend a trump.
                     if card.card_type == Type.SAU and card not in trumps:
-                        return 9.5
-                    return card.card_type.points
+                        return (9.5, True)
+                    return (card.card_type.points, card not in trumps)
 
                 return max(schmier_candidates, key=schmier_priority)
             return _safe_low_card(legal_cards, trumps, cpc)

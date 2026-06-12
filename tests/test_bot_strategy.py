@@ -1,12 +1,15 @@
 from unittest.mock import MagicMock
 
 from card_classes.Cards import Color, Type
+from input_validators.GameDecisionValidator import GameDecisionValidator
 from player_classes.Player import Bot
 from player_classes.bot_strategy import (
     best_hochzeit_swap_card,
+    best_trump_color,
     ramsch_risk,
     wants_to_double_game_value,
     wants_to_partner_hochzeit,
+    wants_to_play,
     wants_to_play_ramsch,
     wants_to_shoot,
 )
@@ -874,3 +877,136 @@ def test_bot_get_card_swap_decision_uses_best_hochzeit_swap_card(
 
     assert decision is gruen_seven
     assert gruen_seven not in bot.player_cards
+
+
+# wants_to_play: baseline mode playability
+
+
+def test_wants_to_play_false_when_no_baseline_mode_playable(
+    eichel_sau,
+    gruen_sau,
+    schellen_sau,
+    eichel_ober,
+    herz_ten,
+    herz_seven,
+    eichel_seven,
+    gruen_seven,
+):
+    # Three Saus and an Ober: comfortably above the want-to-play threshold,
+    # but every callable color's Sau is in hand and three trumps rule out
+    # a Hochzeit - volunteering would force an unsuited Wenz/Solo.
+    hand = [
+        eichel_sau,
+        gruen_sau,
+        schellen_sau,
+        eichel_ober,
+        herz_ten,
+        herz_seven,
+        eichel_seven,
+        gruen_seven,
+    ]
+
+    assert (
+        wants_to_play(
+            hand, players_who_want_to_play_count=0, baseline_mode_playable=False
+        )
+        is False
+    )
+    assert (
+        wants_to_play(
+            hand, players_who_want_to_play_count=0, baseline_mode_playable=True
+        )
+        is True
+    )
+
+
+def test_wants_to_play_solo_hand_ignores_baseline_playability(
+    eichel_ober, gruen_ober, herz_ober, herz_sau, herz_ten
+):
+    # A hand at Solo strength is worth volunteering even if neither
+    # Sauspiel nor Hochzeit would be legal.
+    hand = [eichel_ober, gruen_ober, herz_ober, herz_sau, herz_ten]
+
+    assert (
+        wants_to_play(
+            hand, players_who_want_to_play_count=0, baseline_mode_playable=False
+        )
+        is True
+    )
+
+
+def test_bot_ask_want_choose_game_vetoes_hand_without_legal_baseline_mode(
+    eichel_sau,
+    gruen_sau,
+    schellen_sau,
+    schellen_seven,
+    eichel_ober,
+    herz_ten,
+    herz_seven,
+    eichel_seven,
+    gruen_seven,
+):
+    bot = Bot(
+        bot_name="Bot 1",
+        renderer=MagicMock(),
+        game_decision_validator=GameDecisionValidator(choosable_game_rank_mapping={}),
+    )
+
+    # All three Saus in hand: no callable color, three trumps: no Hochzeit.
+    bot.player_cards = [
+        eichel_sau,
+        gruen_sau,
+        schellen_sau,
+        eichel_ober,
+        herz_ten,
+        herz_seven,
+        eichel_seven,
+        gruen_seven,
+    ]
+    assert bot.ask_want_choose_game(players_who_want_to_play_count=0) is False
+
+    # Swapping the Schellen Sau for the Seven makes Schellen callable.
+    bot.player_cards = [
+        eichel_sau,
+        gruen_sau,
+        schellen_seven,
+        eichel_ober,
+        herz_ten,
+        herz_seven,
+        eichel_seven,
+        gruen_seven,
+    ]
+    assert bot.ask_want_choose_game(players_who_want_to_play_count=0) is True
+
+
+# best_trump_color
+
+
+def test_best_trump_color_picks_longest_color(
+    eichel_seven, eichel_eight, eichel_nine, schellen_sau, schellen_ten
+):
+    cards = [eichel_seven, eichel_eight, eichel_nine, schellen_sau, schellen_ten]
+    options = {
+        "1": Color.EICHEL,
+        "2": Color.GRUEN,
+        "3": Color.HERZ,
+        "4": Color.SCHELLEN,
+    }
+
+    assert best_trump_color(player_cards=cards, options=options) == Color.EICHEL
+
+
+def test_best_trump_color_breaks_ties_with_higher_points(
+    eichel_seven, eichel_eight, schellen_sau, schellen_ten
+):
+    cards = [eichel_seven, eichel_eight, schellen_sau, schellen_ten]
+    options = {
+        "1": Color.EICHEL,
+        "2": Color.GRUEN,
+        "3": Color.HERZ,
+        "4": Color.SCHELLEN,
+    }
+
+    # Eichel and Schellen are equally long, but the Schellen Sau and Ten
+    # become near-unbeatable trumps - pick Schellen.
+    assert best_trump_color(player_cards=cards, options=options) == Color.SCHELLEN

@@ -105,7 +105,11 @@ def hand_strength(player_cards: list[Card]) -> float:
     return score
 
 
-def wants_to_play(player_cards: list[Card], players_who_want_to_play_count: int) -> bool:
+def wants_to_play(
+    player_cards: list[Card],
+    players_who_want_to_play_count: int,
+    baseline_mode_playable: bool = True,
+) -> bool:
     """Decides whether a bot wants to enter the game-choosing process.
 
     A hand strong enough for Wenz/Solo (or better) is always worth offering:
@@ -114,7 +118,11 @@ def wants_to_play(player_cards: list[Card], players_who_want_to_play_count: int)
     choose_preferred_game_mode). A hand that is at best Sauspiel/Hochzeit
     material is only worth offering if this bot is the first chooser - any
     later chooser whose preferred mode is still Sauspiel would be forced to
-    overbid into an unsuited Wenz/Solo instead.
+    overbid into an unsuited Wenz/Solo instead - and only if one of those
+    baseline modes is actually legal for this hand
+    (``baseline_mode_playable``): the first volunteer can never pass, so a
+    hand with no callable sau and the wrong trump count for Hochzeit would
+    likewise end up forced into an unsuited Wenz/Solo.
     """
 
     strength = hand_strength(player_cards)
@@ -124,7 +132,7 @@ def wants_to_play(player_cards: list[Card], players_who_want_to_play_count: int)
     if players_who_want_to_play_count > 0:
         return False
 
-    return strength >= _WANT_TO_PLAY_THRESHOLD
+    return baseline_mode_playable and strength >= _WANT_TO_PLAY_THRESHOLD
 
 
 def wants_to_double_game_value(player_cards: list[Card]) -> bool:
@@ -204,11 +212,20 @@ def _non_trump_color_count(player_cards: list[Card], color: Color) -> int:
 
 def best_trump_color(player_cards: list[Card], options: dict[str, Color]) -> Color:
     """Picks the color the bot holds the most non-Ober/Unter cards of,
-    maximising the bot's own trump count for a Solo."""
+    maximising the bot's own trump count for a Solo. Equally long colors
+    are split by the points held in them: a Sau or Ten of the trump color
+    becomes a near-unbeatable trump, while small cards add little."""
 
-    return max(
-        options.values(), key=lambda color: _non_trump_color_count(player_cards, color)
-    )
+    def trump_color_value(color: Color) -> tuple[int, int]:
+        held = [
+            card
+            for card in player_cards
+            if card.card_color == color
+            and card.card_type not in (Type.OBER, Type.UNTER)
+        ]
+        return (len(held), sum(card.card_type.points for card in held))
+
+    return max(options.values(), key=trump_color_value)
 
 
 def best_sau_color(player_cards: list[Card], options: dict[str, Color]) -> Color:

@@ -266,9 +266,14 @@ class Bot(Player):
         return wants_to_double_game_value(player_cards=self.player_cards)
 
     def ask_want_choose_game(self, players_who_want_to_play_count: int) -> bool:
+        validator = self.game_decision_validator
         return wants_to_play(
             player_cards=self.player_cards,
             players_who_want_to_play_count=players_who_want_to_play_count,
+            baseline_mode_playable=(
+                validator.is_sauspiel_playable(player_cards=self.player_cards)
+                or validator.is_hochzeit_playable(player_cards=self.player_cards)
+            ),
         )
 
     def choose_game_mode(
