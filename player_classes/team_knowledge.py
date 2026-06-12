@@ -31,6 +31,7 @@ def _call_sau_revealer(
     player: Player,
     call_sau: Card,
     trick_history: list[list[tuple[Player, Card]]],
+    current_trick: list[tuple[Player, Card]],
 ) -> Player | None:
     """Returns the player known (to ``player``) to hold/have played
     ``call_sau``, or None if its owner hasn't been revealed yet."""
@@ -38,7 +39,7 @@ def _call_sau_revealer(
     if any(card == call_sau for card in player.player_cards):
         return player
 
-    for trick in trick_history:
+    for trick in trick_history + [current_trick]:
         for trick_player, card in trick:
             if card == call_sau:
                 return trick_player
@@ -53,6 +54,7 @@ def infer_team_knowledge(
     game_chooser: Player | None,
     call_sau: Card | None,
     trick_history: list[list[tuple[Player, Card]]],
+    current_trick: list[tuple[Player, Card]] | None = None,
 ) -> TeamKnowledge:
     """Determines what ``player`` knows about teammates/opponents so far."""
 
@@ -65,7 +67,10 @@ def infer_team_knowledge(
 
     if call_sau is not None and game_chooser is not None:
         revealer = _call_sau_revealer(
-            player=player, call_sau=call_sau, trick_history=trick_history
+            player=player,
+            call_sau=call_sau,
+            trick_history=trick_history,
+            current_trick=current_trick or [],
         )
         if revealer is None:
             if player == game_chooser:

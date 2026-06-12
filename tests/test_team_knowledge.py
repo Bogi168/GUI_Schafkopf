@@ -234,3 +234,79 @@ def test_team_two_player_learns_true_teams_once_callsau_played(
     assert knowledge == TeamKnowledge(
         teammates=[player_4], opponents=[player_1, player_2], unknown=[]
     )
+
+
+def test_callsau_played_in_current_trick_reveals_teams(
+    players,
+    player_1,
+    player_2,
+    player_3,
+    player_4,
+    team_two_players_1,
+    team_two_players_2,
+    eichel_sau,
+    eichel_ten,
+    herz_ten,
+):
+    player_teams = {
+        player_1: team_two_players_1,
+        player_2: team_two_players_1,
+        player_3: team_two_players_2,
+        player_4: team_two_players_2,
+    }
+    player_2.player_cards = []
+    player_3.player_cards = [herz_ten]
+    # The Sau hit the table earlier in this very trick - player_3, still to
+    # act, must not treat the teams as unknown anymore.
+    current_trick = [(player_1, eichel_ten), (player_2, eichel_sau)]
+
+    knowledge = infer_team_knowledge(
+        player=player_3,
+        players=players,
+        player_teams=player_teams,
+        game_chooser=player_1,
+        call_sau=eichel_sau,
+        trick_history=[],
+        current_trick=current_trick,
+    )
+
+    assert knowledge == TeamKnowledge(
+        teammates=[player_4], opponents=[player_1, player_2], unknown=[]
+    )
+
+
+def test_callsau_still_hidden_with_current_trick_passed(
+    players,
+    player_1,
+    player_2,
+    player_3,
+    player_4,
+    team_two_players_1,
+    team_two_players_2,
+    eichel_sau,
+    eichel_ten,
+    herz_ten,
+):
+    player_teams = {
+        player_1: team_two_players_1,
+        player_2: team_two_players_1,
+        player_3: team_two_players_2,
+        player_4: team_two_players_2,
+    }
+    player_2.player_cards = [eichel_sau]
+    player_3.player_cards = [herz_ten]
+    current_trick = [(player_1, eichel_ten), (player_2, herz_ten)]
+
+    knowledge = infer_team_knowledge(
+        player=player_3,
+        players=players,
+        player_teams=player_teams,
+        game_chooser=player_1,
+        call_sau=eichel_sau,
+        trick_history=[],
+        current_trick=current_trick,
+    )
+
+    assert knowledge == TeamKnowledge(
+        teammates=[], opponents=[player_1], unknown=[player_2, player_4]
+    )

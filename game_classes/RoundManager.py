@@ -104,6 +104,7 @@ class RoundManager:
             game_chooser=self.game_chooser,
             call_sau=self.call_sau,
             trick_history=self.trick_history,
+            current_trick=self.current_trick,
         )
         team_sizes = {len(team.players) for team in self.player_teams.values()}
         return CardPlayContext(
