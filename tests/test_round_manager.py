@@ -180,6 +180,28 @@ def test_play_card_appends_decision_and_renders_it(player_1, eichel_sau, eichel_
     assert player_1.get_card_play_decision.call_args.kwargs["context"] is None
 
 
+def test_play_card_notifies_validator_of_played_card(player_1, eichel_sau, eichel_ten):
+    player_1.player_cards = [eichel_ten, eichel_sau]
+    player_1.get_card_play_decision = MagicMock(return_value=eichel_ten)
+    validator = MagicMock()
+
+    round_manager = RoundManager(
+        players=[player_1],
+        player_teams={},
+        trumps=[],
+        card_power_calculator=SauspielCardPowerCalculator(),
+        card_decision_validator=validator,
+        active_team=None,
+        renderer=MagicMock(),
+    )
+
+    round_manager.play_card(player=player_1)
+
+    validator.notify_card_played.assert_called_once_with(
+        card=eichel_ten, was_lead=True, player_cards=player_1.player_cards
+    )
+
+
 def test_play_card_passes_context_for_bot_players(
     player_1, team_alone_player_1, eichel_sau, eichel_ten, sauspiel_trumps
 ):

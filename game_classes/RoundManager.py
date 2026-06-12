@@ -126,6 +126,7 @@ class RoundManager:
         context: CardPlayContext | None = (
             self._build_context(player) if player.is_bot else None
         )
+        was_lead: bool = self.lead_card is None
         card_decision: Card = player.get_card_play_decision(
             move_validator=lambda d, p=player: self.card_decision_validator.is_move_legal(
                 player_cards=p.player_cards,
@@ -136,6 +137,9 @@ class RoundManager:
             context=context,
         )
         self.played_cards.append(card_decision)
+        self.card_decision_validator.notify_card_played(
+            card=card_decision, was_lead=was_lead, player_cards=player.player_cards
+        )
         self.renderer.render_played_card(player=player, card=card_decision)
 
     def get_round_winner(self) -> Player:

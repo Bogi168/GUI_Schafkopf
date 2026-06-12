@@ -136,6 +136,16 @@ class CardDecisionValidator:
     def is_card_swap_legal(self, decision: Card, is_game_chooser: bool) -> bool:
         raise NotImplementedError("Card swaps are not allowed in this game_mode")
 
+    def notify_card_played(
+        self, card: Card, was_lead: bool, player_cards: list[Card]
+    ) -> None:
+        """Informs the validator about a card that was actually played.
+
+        ``player_cards`` is the player's hand after the card was removed.
+        Stateless validators ignore this; SauspielCardDecisionValidator uses
+        it to track Davonlaufen.
+        """
+
 
 class RegularTrumpTypeCardDecisionValidator(CardDecisionValidator):
     def __init__(self) -> None:
@@ -162,6 +172,21 @@ class SauspielCardDecisionValidator(RegularTrumpTypeCardDecisionValidator):
     def __init__(self, call_sau: Card) -> None:
         super().__init__()
         self.call_sau: Card = call_sau
+        # Set once the callsau owner has run away (led a different card of
+        # the call color while holding 4+ of it). From then on the Sau
+        # obligations no longer apply: the owner may hold it back when the
+        # call color is led and may discard it onto other colors.
+        self.ran_away: bool = False
+
+    def notify_card_played(
+        self, card: Card, was_lead: bool, player_cards: list[Card]
+    ) -> None:
+        if (
+            was_lead
+            and self.is_plays_call_sau_color(decision=card)
+            and self.is_player_owns_call_sau(player_cards=player_cards)
+        ):
+            self.ran_away = True
 
     def is_player_owns_call_sau(self, player_cards: list[Card]) -> bool:
         return any(card == self.call_sau for card in player_cards)
@@ -183,7 +208,8 @@ class SauspielCardDecisionValidator(RegularTrumpTypeCardDecisionValidator):
 
     def run_away_prohibition(self, decision: Card, player_cards: list[Card]):
         return (
-            self.is_player_owns_call_sau(player_cards=player_cards)
+            not self.ran_away
+            and self.is_player_owns_call_sau(player_cards=player_cards)
             and not self.is_player_allowed_to_run_away(player_cards=player_cards)
             and self.is_plays_call_sau_color(decision=decision)
         )
@@ -198,7 +224,8 @@ class SauspielCardDecisionValidator(RegularTrumpTypeCardDecisionValidator):
         self, decision: Card, player_cards: list[Card], lead_card: Card
     ) -> bool:
         if (
-            self.is_player_owns_call_sau(player_cards=player_cards)
+            not self.ran_away
+            and self.is_player_owns_call_sau(player_cards=player_cards)
             and lead_card.card_color == self.call_sau.card_color
         ):
             legal_cards = [self.call_sau]
@@ -218,7 +245,8 @@ class SauspielCardDecisionValidator(RegularTrumpTypeCardDecisionValidator):
         trumps: list[Card],
     ) -> bool:
         if (
-            self.is_player_owns_call_sau(player_cards=player_cards)
+            not self.ran_away
+            and self.is_player_owns_call_sau(player_cards=player_cards)
             and lead_card.card_color != self.call_sau.card_color
             and decision == self.call_sau
         ):

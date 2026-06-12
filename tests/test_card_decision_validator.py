@@ -397,6 +397,174 @@ def test_sau_is_not_called_prohibition(
     )
 
 
+# Davonlaufen: once the callsau owner has led a different card of the call
+# color (legal with 4+ of that color), the Sau obligations are lifted.
+
+
+def test_run_away_lifts_sau_obligation(
+    sauspiel_trumps,
+    eichel_sau,
+    eichel_seven,
+    eichel_eight,
+    eichel_nine,
+    eichel_ten,
+    gruen_eight,
+):
+    validator = SauspielCardDecisionValidator(call_sau=eichel_sau)
+    # The owner ran away: led the Eichel Ten while keeping the Sau in hand.
+    validator.notify_card_played(
+        card=eichel_ten,
+        was_lead=True,
+        player_cards=[eichel_sau, eichel_nine, eichel_seven, gruen_eight],
+    )
+
+    lead_card = eichel_eight
+    player_cards = [eichel_sau, eichel_nine, eichel_seven, gruen_eight]
+    assert validator.is_move_legal(
+        decision=eichel_nine,
+        lead_card=lead_card,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
+    assert validator.is_move_legal(
+        decision=eichel_sau,
+        lead_card=lead_card,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
+
+
+def test_run_away_allows_discarding_call_sau(
+    sauspiel_trumps,
+    eichel_sau,
+    eichel_seven,
+    eichel_nine,
+    eichel_ten,
+    schellen_seven,
+    gruen_eight,
+):
+    validator = SauspielCardDecisionValidator(call_sau=eichel_sau)
+    validator.notify_card_played(
+        card=eichel_ten,
+        was_lead=True,
+        player_cards=[eichel_sau, eichel_nine, eichel_seven, gruen_eight],
+    )
+
+    # No Schellen in hand - the Sau may now be discarded onto the trick.
+    lead_card = schellen_seven
+    player_cards = [eichel_sau, eichel_nine, eichel_seven, gruen_eight]
+    assert validator.is_move_legal(
+        decision=eichel_sau,
+        lead_card=lead_card,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
+
+
+def test_run_away_allows_leading_call_color_with_few_cards_left(
+    sauspiel_trumps,
+    eichel_sau,
+    eichel_seven,
+    eichel_nine,
+    eichel_ten,
+    gruen_eight,
+):
+    validator = SauspielCardDecisionValidator(call_sau=eichel_sau)
+    validator.notify_card_played(
+        card=eichel_ten,
+        was_lead=True,
+        player_cards=[eichel_sau, eichel_nine, eichel_seven, gruen_eight],
+    )
+
+    # Down to 3 call-color cards, but the run-away prohibition is gone.
+    player_cards = [eichel_sau, eichel_nine, eichel_seven, gruen_eight]
+    assert validator.is_move_legal(
+        decision=eichel_nine,
+        lead_card=None,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
+
+
+def test_following_suit_is_not_running_away(
+    sauspiel_trumps,
+    eichel_sau,
+    eichel_seven,
+    eichel_eight,
+    eichel_nine,
+    eichel_ten,
+    gruen_eight,
+):
+    validator = SauspielCardDecisionValidator(call_sau=eichel_sau)
+    # The Ten was played as a follow, not as a lead - no Davonlaufen.
+    validator.notify_card_played(
+        card=eichel_ten,
+        was_lead=False,
+        player_cards=[eichel_sau, eichel_nine, eichel_seven, gruen_eight],
+    )
+
+    lead_card = eichel_eight
+    player_cards = [eichel_sau, eichel_nine, eichel_seven, gruen_eight]
+    assert not validator.is_move_legal(
+        decision=eichel_nine,
+        lead_card=lead_card,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
+    assert validator.is_move_legal(
+        decision=eichel_sau,
+        lead_card=lead_card,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
+
+
+def test_call_color_lead_by_non_owner_is_not_running_away(
+    sauspiel_trumps,
+    eichel_sau,
+    eichel_seven,
+    eichel_eight,
+    eichel_nine,
+    eichel_ten,
+    gruen_eight,
+    schellen_seven,
+):
+    validator = SauspielCardDecisionValidator(call_sau=eichel_sau)
+    # Someone without the Sau led the call color - the owner stays bound.
+    validator.notify_card_played(
+        card=eichel_ten,
+        was_lead=True,
+        player_cards=[gruen_eight, schellen_seven],
+    )
+
+    lead_card = eichel_eight
+    player_cards = [eichel_sau, eichel_nine, eichel_seven, gruen_eight]
+    assert not validator.is_move_legal(
+        decision=eichel_nine,
+        lead_card=lead_card,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
+
+
+def test_leading_the_call_sau_itself_is_not_running_away(
+    sauspiel_trumps,
+    eichel_sau,
+    eichel_seven,
+    eichel_nine,
+    eichel_ten,
+    gruen_eight,
+):
+    validator = SauspielCardDecisionValidator(call_sau=eichel_sau)
+    validator.notify_card_played(
+        card=eichel_sau,
+        was_lead=True,
+        player_cards=[eichel_ten, eichel_nine, eichel_seven, gruen_eight],
+    )
+
+    assert not validator.ran_away
+
+
 # WenzCardDecisionValidator: only the four Unter are trump, Ober are regular
 # color cards
 
