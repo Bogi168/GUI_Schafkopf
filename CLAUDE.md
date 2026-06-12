@@ -68,7 +68,7 @@ Rather than putting game-specific logic in `Game`, each concrete game composes t
 
 ### Rendering abstraction
 
-`system/Renderer.py` defines the `Renderer` ABC with semantic render methods (`render`, `render_hand`, `render_played_card`, `render_trick_winner`, `render_game_result`) and ask methods (`ask_player_name`, `ask_play_again`, `ask_yes_no`, `ask_game_mode`, `ask_color`, `ask_card`). All game and player classes receive a `Renderer` instance — no direct `print`/`input` calls outside the renderer implementations. All display strings are pure functions in `system/text.py`; `game_classes/GameRenderer.py` wraps `Renderer` with game-specific render calls.
+`system/Renderer.py` defines the `Renderer` ABC with semantic render methods (`render`, `render_hand`, `render_played_card`, `render_trick_winner`, `render_game_result`) and ask methods (`ask_player_name`, `ask_play_again`, `ask_yes_no`, `ask_game_mode`, `ask_color`, `ask_card`). All game and player classes receive a `Renderer` instance — no direct `print`/`input` calls outside the renderer implementations. All display strings are pure functions in `system/text.py`.
 
 Two implementations exist:
 
