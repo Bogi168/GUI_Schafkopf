@@ -12,6 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from card_classes.Cards import Type
+
 if TYPE_CHECKING:
     from card_classes.Cards import Card
     from player_classes.Player import Player
@@ -43,6 +45,24 @@ def _call_sau_revealer(
         for trick_player, card in trick:
             if card == call_sau:
                 return trick_player
+
+    # Davonlaufen reveals the owner just as surely as playing the Sau:
+    # Sau-Zwang forces the Sau out of the owner whenever anybody else
+    # leads the called colour, so a completed trick led with a non-Sau
+    # card of that colour where the Sau did not fall can only have been
+    # led by the owner running away. (Only completed tricks count - in
+    # the trick still being played the Sau may simply not have fallen
+    # yet.)
+    for trick in trick_history:
+        if not trick:
+            continue
+        leader, lead = trick[0]
+        if (
+            lead.card_color == call_sau.card_color
+            and lead.card_type not in (Type.OBER, Type.UNTER)
+            and lead != call_sau
+        ):
+            return leader
 
     return None
 

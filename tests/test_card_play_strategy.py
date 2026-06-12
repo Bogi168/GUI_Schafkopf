@@ -1508,3 +1508,74 @@ def test_follow_discard_sheds_blanc_card_to_work_towards_void(
     )
 
     assert result == eichel_eight
+
+
+def test_follow_does_not_trump_for_the_sau_after_run_away(
+    eichel_sau,
+    eichel_ten,
+    eichel_nine,
+    eichel_eight,
+    eichel_seven,
+    schellen_seven,
+    schellen_unter,
+    gruen_seven,
+    sauspiel_trumps,
+):
+    player = _FakePlayer(player_cards=[schellen_unter, gruen_seven])
+    # The owner already ran away: a completed Eichel-led trick without the
+    # Sau falling. Sau-Zwang no longer binds, so trumping in to catch the
+    # Sau would just waste a trump on a 0-point trick.
+    run_away_trick = [
+        ("owner", eichel_ten),
+        ("a", eichel_eight),
+        ("b", eichel_nine),
+        ("c", schellen_seven),
+    ]
+    context = _context(
+        current_trick=[("teammate", eichel_seven)],
+        trumps=sauspiel_trumps,
+        call_sau=eichel_sau,
+        history=[card for _, card in run_away_trick],
+        trick_history=[run_away_trick],
+    )
+
+    result = choose_card_to_play(player, [schellen_unter, gruen_seven], context)
+
+    assert result == gruen_seven
+
+
+def test_lead_skips_seeking_after_run_away(
+    eichel_sau,
+    eichel_ten,
+    eichel_nine,
+    eichel_eight,
+    eichel_koenig,
+    schellen_seven,
+    schellen_eight,
+    gruen_unter,
+    sauspiel_trumps,
+):
+    player = _FakePlayer(
+        player_cards=[eichel_ten, schellen_seven, schellen_eight, gruen_unter]
+    )
+    run_away_trick = [
+        ("owner", eichel_koenig),
+        ("a", eichel_eight),
+        ("b", eichel_nine),
+        ("c", schellen_eight),
+    ]
+    context = _context(
+        trumps=sauspiel_trumps,
+        is_active_team=False,
+        call_sau=eichel_sau,
+        history=[card for _, card in run_away_trick],
+        trick_history=[run_away_trick],
+    )
+
+    result = choose_card_to_play(
+        player, [eichel_ten, schellen_seven, schellen_eight, gruen_unter], context
+    )
+
+    # The Sau can no longer be forced out - seeking with the Ten would gift
+    # 10 points; lead from the short Schellen suit instead.
+    assert result == schellen_seven

@@ -310,3 +310,90 @@ def test_callsau_still_hidden_with_current_trick_passed(
     assert knowledge == TeamKnowledge(
         teammates=[], opponents=[player_1], unknown=[player_2, player_4]
     )
+
+
+def test_run_away_lead_reveals_callsau_owner(
+    players,
+    player_1,
+    player_2,
+    player_3,
+    player_4,
+    team_two_players_1,
+    team_two_players_2,
+    eichel_sau,
+    eichel_ten,
+    eichel_nine,
+    eichel_seven,
+    herz_ten,
+):
+    player_teams = {
+        player_1: team_two_players_1,
+        player_2: team_two_players_1,
+        player_3: team_two_players_2,
+        player_4: team_two_players_2,
+    }
+    player_2.player_cards = [eichel_sau]
+    player_3.player_cards = [herz_ten]
+    # player_2 led the call color without the Sau falling - only the owner
+    # can do that (Sau-Zwang would have forced it out of anyone else), so
+    # the teams are now public.
+    trick_history = [
+        [
+            (player_2, eichel_ten),
+            (player_3, eichel_nine),
+            (player_4, eichel_seven),
+            (player_1, herz_ten),
+        ]
+    ]
+
+    knowledge = infer_team_knowledge(
+        player=player_3,
+        players=players,
+        player_teams=player_teams,
+        game_chooser=player_1,
+        call_sau=eichel_sau,
+        trick_history=trick_history,
+    )
+
+    assert knowledge == TeamKnowledge(
+        teammates=[player_4], opponents=[player_1, player_2], unknown=[]
+    )
+
+
+def test_call_color_lead_in_current_trick_is_not_a_reveal(
+    players,
+    player_1,
+    player_2,
+    player_3,
+    player_4,
+    team_two_players_1,
+    team_two_players_2,
+    eichel_sau,
+    eichel_ten,
+    herz_ten,
+):
+    player_teams = {
+        player_1: team_two_players_1,
+        player_2: team_two_players_1,
+        player_3: team_two_players_2,
+        player_4: team_two_players_2,
+    }
+    player_2.player_cards = [eichel_sau]
+    player_3.player_cards = [herz_ten]
+    # The call color was led in the trick still being played - the Sau may
+    # simply not have fallen yet, so nothing is revealed.
+    current_trick = [(player_2, eichel_ten)]
+
+    knowledge = infer_team_knowledge(
+        player=player_3,
+        players=players,
+        player_teams=player_teams,
+        game_chooser=player_1,
+        call_sau=eichel_sau,
+        trick_history=[],
+        current_trick=current_trick,
+    )
+
+    assert knowledge == TeamKnowledge(
+        teammates=[], opponents=[player_1], unknown=[player_2, player_4]
+    )

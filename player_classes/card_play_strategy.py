@@ -121,19 +121,24 @@ def _non_trump_suit_count(cards: list[Card], color: Color, trumps: list[Card]) -
 
 
 def _avoid_call_sau_leads(
-    cards: list[Card], call_sau: Card, player: Player, is_active_team: bool
+    cards: list[Card],
+    call_sau: Card,
+    player: Player,
+    is_active_team: bool,
+    ran_away: bool = False,
 ) -> list[Card]:
     """Cards that don't risk exposing the call sau to a Sau-Zwang.
 
     The call sau holder should never volunteer the Sau itself as a lead,
     and the chooser shouldn't lead the called colour at all - either would
     force the Sau into play and let the opposing team trump it away if
-    they're void.
+    they're void. Once the owner has run away, the unplayed Sau is simply
+    the boss of its suit in somebody else's hand - don't lead into it.
     """
 
     if call_sau in player.player_cards:
         return [card for card in cards if card != call_sau]
-    if is_active_team:
+    if is_active_team or ran_away:
         return [card for card in cards if card.card_color != call_sau.card_color]
     return cards
 
@@ -266,12 +271,43 @@ def _call_sau_safe_to_reveal(player: Player, context: CardPlayContext) -> bool:
     return all(opponent in void_of_trumps for opponent in opponents)
 
 
+def _call_sau_ran_away(context: CardPlayContext) -> bool:
+    """Whether the call sau's holder is known to have run away (Davonlaufen).
+
+    Sau-Zwang forces the Sau out of the owner whenever anybody else leads
+    the called colour, so a completed trick led with a non-Sau card of that
+    colour where the Sau did not fall can only have been led by the owner
+    running away - which lifts the Sau obligations for the rest of the game.
+    """
+
+    call_sau = context.call_sau
+    if call_sau is None:
+        return False
+
+    for trick in context.trick_history:
+        if not trick:
+            continue
+        _, lead = trick[0]
+        if (
+            lead.card_color == call_sau.card_color
+            and lead not in context.trumps
+            and lead != call_sau
+            and not any(card == call_sau for _, card in trick)
+        ):
+            return True
+
+    return False
+
+
 def _call_sau_owner_forced_this_trick(context: CardPlayContext, lead_card: Card) -> bool:
     """Whether Sau-Zwang guarantees the call sau's holder must still play it
     on this trick - someone other than the holder led the called colour."""
 
     call_sau = context.call_sau
     if call_sau is None or call_sau in context.played_cards_history:
+        return False
+
+    if _call_sau_ran_away(context):
         return False
 
     return lead_card.card_color == call_sau.card_color and lead_card != call_sau
@@ -346,9 +382,11 @@ def _choose_lead_card(
                         run_away_candidates,
                         key=lambda card: (card.card_type.points, cpc.get_card_power(card)),
                     )
-        elif not context.is_active_team:
+        elif not context.is_active_team and not _call_sau_ran_away(context):
             # Seeking: lead a low card of the called colour, hoping our
             # still-unknown partner is void and can trump the Sau away.
+            # Pointless once the owner has run away - the Sau can no
+            # longer be forced out.
             seek_candidates = [
                 card
                 for card in legal_cards
@@ -418,7 +456,11 @@ def _choose_lead_card(
     non_trump_legal = [card for card in legal_cards if card not in trumps]
     if call_sau_in_play and not _call_sau_safe_to_reveal(player, context):
         filtered = _avoid_call_sau_leads(
-            non_trump_legal, call_sau, player, context.is_active_team
+            non_trump_legal,
+            call_sau,
+            player,
+            context.is_active_team,
+            ran_away=_call_sau_ran_away(context),
         )
         if filtered:
             non_trump_legal = filtered
