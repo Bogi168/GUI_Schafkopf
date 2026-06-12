@@ -352,8 +352,43 @@ def _choose_lead_card(
         )
 
     if context.is_tout and not context.team_knowledge.teammates:
-        # The Tout chooser has no margin for error: stay in control by
-        # leading the strongest card available.
+        # The Tout chooser has no margin for error. Drain trumps while our
+        # top trump is unbeatable; once a higher trump is outstanding, a
+        # trump lead is a guaranteed loss against a rational defender
+        # (Trumpfzwang lets them take it), so switch to suit tops that lose
+        # only to a ruff - from the shortest suit, where the opponents hold
+        # the most cards and are least likely to be void.
+        tout_unseen = _remaining_unseen_cards(
+            own_hand=player.player_cards,
+            played_cards_history=context.played_cards_history,
+            current_trick_cards=[],
+        )
+        guaranteed_tout_trumps = [
+            card
+            for card in legal_cards
+            if card in trumps
+            and _is_highest_remaining(card, tout_unseen, trumps, cpc)
+        ]
+        if guaranteed_tout_trumps:
+            return max(guaranteed_tout_trumps, key=cpc.get_card_power)
+        suit_bosses = [
+            card
+            for card in legal_cards
+            if card not in trumps
+            and not any(
+                unseen.card_color == card.card_color
+                and unseen not in trumps
+                and cpc.get_card_power(unseen) > cpc.get_card_power(card)
+                for unseen in tout_unseen
+            )
+        ]
+        if suit_bosses:
+            return min(
+                suit_bosses,
+                key=lambda card: _non_trump_suit_count(
+                    player.player_cards, card.card_color, trumps
+                ),
+            )
         return max(legal_cards, key=cpc.get_card_power)
 
     call_sau = context.call_sau

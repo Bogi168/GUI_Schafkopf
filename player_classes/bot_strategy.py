@@ -30,20 +30,53 @@ _WANT_TO_PLAY_THRESHOLD = 8.0
 # be very good for a Sauspiel.
 _DOUBLE_GAME_VALUE_THRESHOLD = _WANT_TO_PLAY_THRESHOLD
 
-# Hand strength needed to choose/overbid into a Wenz/Solo or a Tout.
-_SOLO_THRESHOLD = 11.0
-_TOUT_THRESHOLD = 16.0
+# Solo viability, measured over thousands of simulated bot games: the
+# chooser's trump count dominates the outcome (5 trumps won 24%, 6 trumps
+# 54%, 7 trumps 87%). Six-trump solos are only profitable when the trump
+# quality and side aces make up for the missing trump: Obers plus non-trump
+# Saus of at least _SOLO_SIX_TRUMP_QUALITY.
+_SOLO_MIN_TRUMPS = 7
+_SOLO_SIX_TRUMP_QUALITY = 3
 
 # Accepting a Hochzeit means carrying the partner team almost alone: the
 # game chooser hands over their single trump and contributes points, but no
 # further trump support. That needs a hand clearly stronger than a normal
-# want-to-play hand (8.0), though not full Solo strength (11.0) - the swap
-# adds one trump and the chooser's card points still count for the team.
+# want-to-play hand (8.0) - the swap adds one trump and the chooser's card
+# points still count for the team.
 _HOCHZEIT_PARTNER_THRESHOLD = 10.0
 
-# Holding this many of the four Unter makes Wenz attractive on its own, even
-# if the rest of the hand wouldn't otherwise reach _SOLO_THRESHOLD.
+# Wenz viability, measured the same way: Unter alone don't carry a Wenz
+# (3 Unter with no Sau won 8% of the time) - the side suits have to win
+# tricks too. At least _WENZ_MIN_UNTER Unter and a combined count of Unter
+# and Saus of at least _WENZ_MIN_UNTER_PLUS_SAUS (3 Unter + 2 Saus won 61%,
+# 4 Unter + 1 Sau 50%) marks the profitable region.
 _WENZ_MIN_UNTER = 3
+_WENZ_MIN_UNTER_PLUS_SAUS = 5
+
+# Suit rankings used to check for "standing" side suits (every held card of
+# a suit is part of an unbroken run from the Sau down, so each one wins its
+# trick once trumps are drained). In Wenz the Ober is a regular suit card
+# between König and Nine; in Solo the Ober and Unter are trumps.
+_WENZ_SUIT_ORDER = (
+    Type.SAU,
+    Type.TEN,
+    Type.KOENIG,
+    Type.OBER,
+    Type.NINE,
+    Type.EIGHT,
+    Type.SEVEN,
+)
+_SOLO_SUIT_ORDER = (
+    Type.SAU,
+    Type.TEN,
+    Type.KOENIG,
+    Type.NINE,
+    Type.EIGHT,
+    Type.SEVEN,
+)
+
+# The three highest Ober (trump tops a Solo Tout must own).
+_TOP_OBER_COLORS = (Color.EICHEL, Color.GRUEN, Color.HERZ)
 
 # Wenz/WenzTout: there are only 4 Unter trumps in total.
 _WENZ_TRUMP_COUNT = 4
@@ -105,6 +138,129 @@ def hand_strength(player_cards: list[Card]) -> float:
     return score
 
 
+def _sau_count(player_cards: list[Card]) -> int:
+    return sum(1 for card in player_cards if card.card_type == Type.SAU)
+
+
+def _solo_trump_count(player_cards: list[Card], trump_color: Color) -> int:
+    return sum(
+        1
+        for card in player_cards
+        if card.card_type in (Type.OBER, Type.UNTER)
+        or card.card_color == trump_color
+    )
+
+
+def _best_solo_color(player_cards: list[Card]) -> Color:
+    return best_trump_color(
+        player_cards=player_cards,
+        options={str(i): color for i, color in enumerate(Color, start=1)},
+    )
+
+
+def is_solo_worthy(player_cards: list[Card], trump_color: Color) -> bool:
+    """Whether the hand is strong enough to profitably choose a Solo in
+    ``trump_color`` (see _SOLO_MIN_TRUMPS / _SOLO_SIX_TRUMP_QUALITY)."""
+
+    trump_count = _solo_trump_count(player_cards, trump_color)
+    if trump_count >= _SOLO_MIN_TRUMPS:
+        return True
+    if trump_count != _SOLO_MIN_TRUMPS - 1:
+        return False
+
+    obers = sum(1 for card in player_cards if card.card_type == Type.OBER)
+    side_saus = sum(
+        1
+        for card in player_cards
+        if card.card_type == Type.SAU and card.card_color != trump_color
+    )
+    return obers + side_saus >= _SOLO_SIX_TRUMP_QUALITY
+
+
+def is_wenz_worthy(player_cards: list[Card]) -> bool:
+    """Whether the hand is strong enough to profitably choose a Wenz (see
+    _WENZ_MIN_UNTER / _WENZ_MIN_UNTER_PLUS_SAUS)."""
+
+    unters = _unter_count(player_cards)
+    return (
+        unters >= _WENZ_MIN_UNTER
+        and unters + _sau_count(player_cards) >= _WENZ_MIN_UNTER_PLUS_SAUS
+    )
+
+
+def _suits_are_standing(
+    player_cards: list[Card],
+    trump_types: tuple[Type, ...],
+    trump_color: Color | None,
+    suit_order: tuple[Type, ...],
+) -> bool:
+    """Whether every non-trump suit the hand holds is an unbroken run from
+    the Sau down (``suit_order``), so each card wins its trick once the
+    trumps are drained."""
+
+    for color in Color:
+        if color == trump_color:
+            continue
+        held = sorted(
+            (
+                card.card_type
+                for card in player_cards
+                if card.card_color == color and card.card_type not in trump_types
+            ),
+            key=suit_order.index,
+        )
+        if held != list(suit_order[: len(held)]):
+            return False
+    return True
+
+
+def is_wenz_tout_worthy(player_cards: list[Card]) -> bool:
+    """Whether the hand all but wins a Wenz Tout outright.
+
+    Holding all four Unter - or the three highest, so the outstanding
+    Schellen Unter can never beat one of ours and falls under our first
+    Unter lead (Trumpfzwang) - drains every trump while keeping the lead.
+    If on top of that every side suit is standing, the only way to lose a
+    trick is an early ruff by the lone low Unter before we get to lead.
+    """
+
+    unters = [card for card in player_cards if card.card_type == Type.UNTER]
+    if len(unters) < _WENZ_MIN_UNTER:
+        return False
+    if len(unters) == _WENZ_MIN_UNTER and Color.SCHELLEN in {
+        unter.card_color for unter in unters
+    }:
+        # Missing one of the three high Unter: it could overtrump us.
+        return False
+    return _suits_are_standing(
+        player_cards,
+        trump_types=(Type.UNTER,),
+        trump_color=None,
+        suit_order=_WENZ_SUIT_ORDER,
+    )
+
+
+def is_solo_tout_worthy(player_cards: list[Card], trump_color: Color) -> bool:
+    """Whether the hand is near-certain to win a Solo Tout in
+    ``trump_color``: at least _SOLO_MIN_TRUMPS trumps including the three
+    highest Ober, and nothing but standing cards outside the trump suit."""
+
+    if _solo_trump_count(player_cards, trump_color) < _SOLO_MIN_TRUMPS:
+        return False
+    for ober_color in _TOP_OBER_COLORS:
+        if not any(
+            card.card_type == Type.OBER and card.card_color == ober_color
+            for card in player_cards
+        ):
+            return False
+    return _suits_are_standing(
+        player_cards,
+        trump_types=(Type.OBER, Type.UNTER),
+        trump_color=trump_color,
+        suit_order=_SOLO_SUIT_ORDER,
+    )
+
+
 def wants_to_play(
     player_cards: list[Card],
     players_who_want_to_play_count: int,
@@ -112,9 +268,9 @@ def wants_to_play(
 ) -> bool:
     """Decides whether a bot wants to enter the game-choosing process.
 
-    A hand strong enough for Wenz/Solo (or better) is always worth offering:
-    such a mode either still outranks whatever the earlier choosers landed
-    on, or this bot can simply pass once it's its turn (see
+    A hand worth a Wenz/Solo (or a Tout) is always worth offering: such a
+    mode either still outranks whatever the earlier choosers landed on, or
+    this bot can simply pass once it's its turn (see
     choose_preferred_game_mode). A hand that is at best Sauspiel/Hochzeit
     material is only worth offering if this bot is the first chooser - any
     later chooser whose preferred mode is still Sauspiel would be forced to
@@ -125,14 +281,19 @@ def wants_to_play(
     likewise end up forced into an unsuited Wenz/Solo.
     """
 
-    strength = hand_strength(player_cards)
-    if strength >= _SOLO_THRESHOLD or _unter_count(player_cards) >= _WENZ_MIN_UNTER:
+    best_color = _best_solo_color(player_cards)
+    if (
+        is_wenz_worthy(player_cards)
+        or is_solo_worthy(player_cards, best_color)
+        or is_wenz_tout_worthy(player_cards)
+        or is_solo_tout_worthy(player_cards, best_color)
+    ):
         return True
 
     if players_who_want_to_play_count > 0:
         return False
 
-    return baseline_mode_playable and strength >= _WANT_TO_PLAY_THRESHOLD
+    return baseline_mode_playable and hand_strength(player_cards) >= _WANT_TO_PLAY_THRESHOLD
 
 
 def wants_to_double_game_value(player_cards: list[Card]) -> bool:
@@ -153,22 +314,21 @@ def choose_preferred_game_mode(
     options: dict[str, type[Game]],
     can_pass: bool,
 ) -> type[Game] | None:
-    """Picks the legal game mode that best matches the hand's strength.
+    """Picks the legal game mode that best matches the hand.
 
-    Hochzeit and Sauspiel are the baseline. A hand strong enough for
-    _SOLO_THRESHOLD (or holding at least _WENZ_MIN_UNTER Unter) is steered
-    towards Wenz or Solo, whichever fits the hand better, and a hand strong
-    enough for _TOUT_THRESHOLD goes for the matching Tout. If none of the
-    preferred modes are among the legal ``options`` (e.g. because they don't
-    outrank a previous offer), the bot passes if allowed, otherwise falls
-    back to the lowest-ranked legal mode.
+    Hochzeit and Sauspiel are the baseline. A hand passing is_wenz_worthy /
+    is_solo_worthy is steered towards that alone game, and a hand passing
+    the much stricter Tout checks goes for the matching Tout first. If none
+    of the preferred modes are among the legal ``options`` (e.g. because
+    they don't outrank a previous offer), the bot passes if allowed,
+    otherwise falls back to the lowest-ranked legal mode.
     """
 
     candidates_by_rank = {mode.rank: mode for mode in options.values()}
     if not candidates_by_rank:
         return None
 
-    strength = hand_strength(player_cards)
+    best_color = _best_solo_color(player_cards)
     wenz_favored = _unter_count(player_cards) >= _WENZ_MIN_UNTER
 
     if wenz_favored:
@@ -178,19 +338,20 @@ def choose_preferred_game_mode(
         family_rank, family_tout_rank = _SOLO_RANK, _SOLO_TOUT_RANK
         other_rank, other_tout_rank = _WENZ_RANK, _WENZ_TOUT_RANK
 
-    if strength >= _TOUT_THRESHOLD:
-        preference_order = [
-            family_tout_rank,
-            other_tout_rank,
-            family_rank,
-            other_rank,
-            _HOCHZEIT_RANK,
-            _SAUSPIEL_RANK,
-        ]
-    elif strength >= _SOLO_THRESHOLD or wenz_favored:
-        preference_order = [family_rank, other_rank, _HOCHZEIT_RANK, _SAUSPIEL_RANK]
-    else:
-        preference_order = [_HOCHZEIT_RANK, _SAUSPIEL_RANK]
+    preference_order: list[int] = []
+    if is_wenz_tout_worthy(player_cards):
+        # A guaranteed Wenz Tout beats the merely near-certain Solo Tout.
+        preference_order.append(_WENZ_TOUT_RANK)
+    if is_solo_tout_worthy(player_cards, best_color):
+        preference_order.append(_SOLO_TOUT_RANK)
+    # Solo wins more often than Wenz at their respective viability
+    # boundaries (87% with 7 trumps vs 61% with 3 Unter + 2 Saus), so it
+    # comes first when the hand supports both.
+    if is_solo_worthy(player_cards, best_color):
+        preference_order.append(_SOLO_RANK)
+    if is_wenz_worthy(player_cards):
+        preference_order.append(_WENZ_RANK)
+    preference_order += [_HOCHZEIT_RANK, _SAUSPIEL_RANK]
 
     for rank in preference_order:
         mode = candidates_by_rank.get(rank)

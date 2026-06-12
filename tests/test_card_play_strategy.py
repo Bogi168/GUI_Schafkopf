@@ -1579,3 +1579,27 @@ def test_lead_skips_seeking_after_run_away(
     # The Sau can no longer be forced out - seeking with the Ten would gift
     # 10 points; lead from the short Schellen suit instead.
     assert result == schellen_seven
+
+
+def test_lead_tout_chooser_avoids_beatable_trump_when_higher_one_is_out(
+    gruen_ober, eichel_sau, eichel_ten, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[gruen_ober, eichel_sau, eichel_ten])
+    context = _context(trumps=sauspiel_trumps, is_tout=True)
+
+    result = choose_card_to_play(player, [gruen_ober, eichel_sau, eichel_ten], context)
+
+    # The unseen Eichel Ober beats the Gruen Ober, so a trump lead loses
+    # the Tout for sure (Trumpfzwang). The Eichel Sau only loses to a ruff.
+    assert result == eichel_sau
+
+
+def test_lead_tout_chooser_keeps_draining_with_boss_trump(
+    eichel_ober, gruen_ober, eichel_sau, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[eichel_ober, gruen_ober, eichel_sau])
+    context = _context(trumps=sauspiel_trumps, is_tout=True)
+
+    result = choose_card_to_play(player, [eichel_ober, gruen_ober, eichel_sau], context)
+
+    assert result == eichel_ober

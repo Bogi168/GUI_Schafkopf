@@ -9,6 +9,10 @@ from player_classes.bot_strategy import (
     best_hochzeit_swap_card,
     best_trump_color,
     choose_preferred_game_mode,
+    is_solo_tout_worthy,
+    is_solo_worthy,
+    is_wenz_tout_worthy,
+    is_wenz_worthy,
     ramsch_risk,
     wants_to_double_game_value,
     wants_to_partner_hochzeit,
@@ -924,11 +928,19 @@ def test_wants_to_play_false_when_no_baseline_mode_playable(
 
 
 def test_wants_to_play_solo_hand_ignores_baseline_playability(
-    eichel_ober, gruen_ober, herz_ober, herz_sau, herz_ten
+    eichel_ober, gruen_ober, herz_ober, eichel_unter, herz_sau, herz_ten, herz_koenig
 ):
-    # A hand at Solo strength is worth volunteering even if neither
-    # Sauspiel nor Hochzeit would be legal.
-    hand = [eichel_ober, gruen_ober, herz_ober, herz_sau, herz_ten]
+    # A solo-worthy hand (7 Herz trumps) is worth volunteering even if
+    # neither Sauspiel nor Hochzeit would be legal.
+    hand = [
+        eichel_ober,
+        gruen_ober,
+        herz_ober,
+        eichel_unter,
+        herz_sau,
+        herz_ten,
+        herz_koenig,
+    ]
 
     assert (
         wants_to_play(
@@ -1061,3 +1073,127 @@ def test_choose_preferred_game_mode_weak_hand_passes_when_allowed(
     )
 
     assert result is None
+
+
+# is_solo_worthy / is_wenz_worthy: measured viability boundaries
+
+
+def test_is_solo_worthy_with_seven_trumps(
+    eichel_ober, gruen_ober, eichel_unter, herz_sau, herz_ten, herz_koenig, herz_seven
+):
+    hand = [eichel_ober, gruen_ober, eichel_unter, herz_sau, herz_ten, herz_koenig, herz_seven]
+
+    assert is_solo_worthy(hand, trump_color=Color.HERZ) is True
+
+
+def test_is_solo_worthy_six_trumps_needs_obers_or_side_saus(
+    eichel_ober,
+    gruen_ober,
+    herz_ober,
+    eichel_unter,
+    herz_sau,
+    herz_ten,
+    herz_koenig,
+    herz_seven,
+    eichel_sau,
+    schellen_seven,
+):
+    # Six trumps with two Obers and no side Sau: quality 2, not worth it.
+    weak = [eichel_ober, gruen_ober, eichel_unter, herz_sau, herz_ten, herz_koenig]
+    assert is_solo_worthy(weak, trump_color=Color.HERZ) is False
+
+    # A third Ober or a side Sau pushes the same six trumps over the bar.
+    with_third_ober = weak[:-1] + [herz_ober]
+    assert is_solo_worthy(with_third_ober, trump_color=Color.HERZ) is True
+    with_side_sau = weak + [eichel_sau, schellen_seven]
+    assert is_solo_worthy(with_side_sau, trump_color=Color.HERZ) is True
+
+
+def test_is_solo_worthy_five_trumps_is_never_enough(
+    eichel_ober, gruen_ober, herz_ober, schellen_ober, herz_sau, eichel_sau, gruen_sau
+):
+    # Even four Obers and two side Saus don't make up for holding only
+    # five trumps - measured win rate at five trumps was 24%.
+    hand = [eichel_ober, gruen_ober, herz_ober, schellen_ober, herz_sau, eichel_sau, gruen_sau]
+
+    assert is_solo_worthy(hand, trump_color=Color.HERZ) is False
+
+
+def test_is_wenz_worthy_requires_unter_and_saus(
+    eichel_unter,
+    gruen_unter,
+    herz_unter,
+    schellen_unter,
+    eichel_sau,
+    gruen_sau,
+    herz_sau,
+    schellen_seven,
+):
+    # Three Unter alone won only 8% of simulated Wenz games.
+    assert is_wenz_worthy([eichel_unter, gruen_unter, herz_unter, schellen_seven]) is False
+
+    # Three Unter plus two Saus is the profitable region (61% wins).
+    assert is_wenz_worthy([eichel_unter, gruen_unter, herz_unter, eichel_sau, gruen_sau]) is True
+
+    # Saus can't replace the Unter themselves.
+    assert is_wenz_worthy([eichel_unter, gruen_unter, eichel_sau, gruen_sau, herz_sau]) is False
+
+    # Four Unter need only one Sau.
+    assert (
+        is_wenz_worthy([eichel_unter, gruen_unter, herz_unter, schellen_unter, eichel_sau])
+        is True
+    )
+
+
+# is_wenz_tout_worthy / is_solo_tout_worthy
+
+
+def test_is_wenz_tout_worthy_with_top_three_unter_and_standing_suits(
+    eichel_unter, gruen_unter, herz_unter, eichel_sau, gruen_sau, gruen_ten
+):
+    hand = [eichel_unter, gruen_unter, herz_unter, eichel_sau, gruen_sau, gruen_ten]
+
+    assert is_wenz_tout_worthy(hand) is True
+
+
+def test_is_wenz_tout_worthy_rejects_three_unter_missing_a_high_one(
+    eichel_unter, herz_unter, schellen_unter, eichel_sau, gruen_sau, gruen_ten
+):
+    # The outstanding Gruen Unter could overtrump our Herz/Schellen Unter.
+    hand = [eichel_unter, herz_unter, schellen_unter, eichel_sau, gruen_sau, gruen_ten]
+
+    assert is_wenz_tout_worthy(hand) is False
+
+
+def test_is_wenz_tout_worthy_rejects_broken_side_suit(
+    eichel_unter, gruen_unter, herz_unter, schellen_unter, gruen_ten
+):
+    # The Gruen Ten is not standing while the Gruen Sau is out.
+    hand = [eichel_unter, gruen_unter, herz_unter, schellen_unter, gruen_ten]
+
+    assert is_wenz_tout_worthy(hand) is False
+
+
+def test_is_solo_tout_worthy_needs_seven_trumps_top_obers_and_standing_sides(
+    eichel_ober,
+    gruen_ober,
+    herz_ober,
+    schellen_ober,
+    eichel_unter,
+    herz_sau,
+    herz_ten,
+    herz_koenig,
+    eichel_sau,
+    eichel_ten,
+):
+    hand = [eichel_ober, gruen_ober, herz_ober, eichel_unter, herz_sau, herz_ten, herz_koenig, eichel_sau]
+    assert is_solo_tout_worthy(hand, trump_color=Color.HERZ) is True
+
+    # The same hand with the Herz Ober swapped for the Schellen Ober no
+    # longer holds the three highest trumps.
+    no_top = [eichel_ober, gruen_ober, schellen_ober, eichel_unter, herz_sau, herz_ten, herz_koenig, eichel_sau]
+    assert is_solo_tout_worthy(no_top, trump_color=Color.HERZ) is False
+
+    # An Eichel Ten without the Eichel Sau is not standing.
+    broken_side = hand[:-1] + [eichel_ten]
+    assert is_solo_tout_worthy(broken_side, trump_color=Color.HERZ) is False
