@@ -91,19 +91,29 @@ def _safe_low_card(
     cards: list[Card],
     trumps: list[Card],
     card_power_calculator: CardPowerCalculator,
+    hand: list[Card] | None = None,
 ) -> Card:
     """The least valuable card to part with - prefers shedding non-trumps
-    and, among those, the lowest-point (then lowest-power) card."""
+    and, among those, the lowest-point card. When ``hand`` is given, point
+    ties go to the card from the shortest suit, working towards a void
+    that can later be trumped; the lowest-power card decides last."""
 
     non_trump = [card for card in cards if card not in trumps]
     pool = non_trump or cards
-    return min(
-        pool,
-        key=lambda card: (
+
+    def shed_priority(card: Card) -> tuple[int, int, int]:
+        suit_length = (
+            _non_trump_suit_count(hand, card.card_color, trumps)
+            if hand is not None and card not in trumps
+            else 0
+        )
+        return (
             card.card_type.points,
+            suit_length,
             card_power_calculator.get_card_power(card),
-        ),
-    )
+        )
+
+    return min(pool, key=shed_priority)
 
 
 def _non_trump_suit_count(cards: list[Card], color: Color, trumps: list[Card]) -> int:
@@ -530,7 +540,7 @@ def _choose_follow_card(
                 # Nothing is safe from being overtaken - the strongest card
                 # is the best bet to stay ahead.
                 return max(winning_cards, key=cpc.get_card_power)
-            return _safe_low_card(legal_cards, trumps, cpc)
+            return _safe_low_card(legal_cards, trumps, cpc, hand=player.player_cards)
 
         # A defender only needs to win one trick to defeat the Tout.
         chooser_has_acted = any(
@@ -540,19 +550,19 @@ def _choose_follow_card(
         if chooser_has_acted and is_teammate_winning:
             # A teammate already beat the chooser - the trick (and with it
             # the game) belongs to the defense, don't waste anything.
-            return _safe_low_card(legal_cards, trumps, cpc)
+            return _safe_low_card(legal_cards, trumps, cpc, hand=player.player_cards)
         if chooser_has_acted:
             if winning_cards:
                 # Beating the chooser's card ends the Tout right here.
                 return min(winning_cards, key=cpc.get_card_power)
-            return _safe_low_card(legal_cards, trumps, cpc)
+            return _safe_low_card(legal_cards, trumps, cpc, hand=player.player_cards)
         # The chooser still has to act: commit a card nothing can beat if
         # we have one, otherwise raise the pressure cheaply.
         if guaranteed_winners:
             return min(guaranteed_winners, key=cpc.get_card_power)
         if winning_cards:
             return min(winning_cards, key=cpc.get_card_power)
-        return _safe_low_card(legal_cards, trumps, cpc)
+        return _safe_low_card(legal_cards, trumps, cpc, hand=player.player_cards)
 
     if context.is_ramsch:
         if losing_cards:
@@ -572,6 +582,13 @@ def _choose_follow_card(
 
     if is_teammate_winning:
         if winning_cards:
+            # Only opponents (or players of unknown allegiance) endanger a
+            # teammate's trick - a teammate overtaking keeps it in the team.
+            yet_to_act_threats = [
+                other
+                for other in yet_to_act
+                if other not in team_knowledge.teammates
+            ]
             if strongest not in trumps:
                 sau_of_suit = next(
                     (
@@ -582,14 +599,37 @@ def _choose_follow_card(
                     ),
                     None,
                 )
-                if sau_of_suit is not None:
+                threat_can_trump = any(
+                    threat in _players_void_of_suit(context, strongest.card_color)
+                    and threat not in _players_void_of_trumps(context)
+                    for threat in yet_to_act_threats
+                )
+                if sau_of_suit is not None and not threat_can_trump:
                     # Our teammate's non-trump card is winning, but a later
                     # opponent could still overtake it with a higher card of
                     # the same suit. Playing the Sau both secures the trick
-                    # and adds the most possible points for the team.
+                    # and adds the most possible points for the team - unless
+                    # a threat is proven able to trump, which would gift the
+                    # Sau's 11 points away.
                     return sau_of_suit
+            if trick_points_so_far >= _HIGH_VALUE_THRESHOLD and not _trick_secured(
+                strongest=strongest,
+                yet_to_act=yet_to_act_threats,
+                unseen_cards=unseen,
+                context=context,
+            ):
+                # Uebernehmen: the teammate's card can still be beaten and
+                # the trick is too fat to gamble on - take it over with the
+                # cheapest winner nobody yet to act can overtake.
+                secure_winners = [
+                    card
+                    for card in winning_cards
+                    if _trick_secured(card, yet_to_act_threats, unseen, context)
+                ]
+                if secure_winners:
+                    return min(secure_winners, key=cpc.get_card_power)
             # The trick is already ours - no need to spend a strong card.
-            return _safe_low_card(legal_cards, trumps, cpc)
+            return _safe_low_card(legal_cards, trumps, cpc, hand=player.player_cards)
 
         secured = _trick_secured(
             strongest=strongest,
@@ -616,9 +656,9 @@ def _choose_follow_card(
                     return (card.card_type.points, card not in trumps)
 
                 return max(schmier_candidates, key=schmier_priority)
-            return _safe_low_card(legal_cards, trumps, cpc)
+            return _safe_low_card(legal_cards, trumps, cpc, hand=player.player_cards)
         # Too risky - an opponent could still overtake, don't feed points.
-        return _safe_low_card(legal_cards, trumps, cpc)
+        return _safe_low_card(legal_cards, trumps, cpc, hand=player.player_cards)
 
     # The current winner is an opponent (or not yet known to be a teammate).
     if winning_cards:
@@ -642,7 +682,7 @@ def _choose_follow_card(
                     return min(secure_winners, key=cpc.get_card_power)
             return cheapest
         if losing_cards:
-            return _safe_low_card(losing_cards, trumps, cpc)
+            return _safe_low_card(losing_cards, trumps, cpc, hand=player.player_cards)
         return cheapest
 
-    return _safe_low_card(legal_cards, trumps, cpc)
+    return _safe_low_card(legal_cards, trumps, cpc, hand=player.player_cards)

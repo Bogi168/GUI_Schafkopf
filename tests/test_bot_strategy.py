@@ -1,11 +1,14 @@
 from unittest.mock import MagicMock
 
 from card_classes.Cards import Color, Type
+from game_classes.game_modes.Solo import Solo
+from game_classes.game_modes.Wenz import Wenz
 from input_validators.GameDecisionValidator import GameDecisionValidator
 from player_classes.Player import Bot
 from player_classes.bot_strategy import (
     best_hochzeit_swap_card,
     best_trump_color,
+    choose_preferred_game_mode,
     ramsch_risk,
     wants_to_double_game_value,
     wants_to_partner_hochzeit,
@@ -1010,3 +1013,51 @@ def test_best_trump_color_breaks_ties_with_higher_points(
     # Eichel and Schellen are equally long, but the Schellen Sau and Ten
     # become near-unbeatable trumps - pick Schellen.
     assert best_trump_color(player_cards=cards, options=options) == Color.SCHELLEN
+
+
+# choose_preferred_game_mode: forced overbid fallback
+
+
+def test_choose_preferred_game_mode_forced_overbid_prefers_solo_for_unter_poor_hand(
+    eichel_seven, eichel_eight, gruen_seven
+):
+    # A weak hand forced to overbid (it cannot pass) should pick the solo
+    # family that fits the hand: without Unter, a Solo in the bot's best
+    # color beats a trumpless Wenz - and both cost the same to lose.
+    options = {"4": Wenz, "5": Solo}
+
+    result = choose_preferred_game_mode(
+        player_cards=[eichel_seven, eichel_eight, gruen_seven],
+        options=options,
+        can_pass=False,
+    )
+
+    assert result is Solo
+
+
+def test_choose_preferred_game_mode_forced_overbid_prefers_wenz_for_unter_heavy_hand(
+    eichel_unter, gruen_unter, schellen_unter, eichel_seven
+):
+    options = {"4": Wenz, "5": Solo}
+
+    result = choose_preferred_game_mode(
+        player_cards=[eichel_unter, gruen_unter, schellen_unter, eichel_seven],
+        options=options,
+        can_pass=False,
+    )
+
+    assert result is Wenz
+
+
+def test_choose_preferred_game_mode_weak_hand_passes_when_allowed(
+    eichel_seven, eichel_eight, gruen_seven
+):
+    options = {"4": Wenz, "5": Solo}
+
+    result = choose_preferred_game_mode(
+        player_cards=[eichel_seven, eichel_eight, gruen_seven],
+        options=options,
+        can_pass=True,
+    )
+
+    assert result is None

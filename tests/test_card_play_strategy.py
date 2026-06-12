@@ -1422,3 +1422,89 @@ def test_follow_schmier_feeds_non_trump_ten_before_trump_ten(
     # Both Tens are worth 10 points, but the Herz Ten is a trump that can
     # still win a trick later - feed the Schellen Ten instead.
     assert result == schellen_ten
+
+
+# Follow: taking over a threatened teammate trick (Uebernehmen)
+
+
+def test_follow_takes_over_threatened_fat_teammate_trick(
+    gruen_sau, gruen_eight, schellen_eight, eichel_ober, schellen_seven, sauspiel_trumps
+):
+    # Teammate leads the Gruen Sau (11 points), but "opp2" was proven void
+    # of Gruen earlier and may still hold trumps - ducking would gift the
+    # trick to a trump stab. Take it over with the unbeatable Eichel Ober.
+    player = _FakePlayer(player_cards=[eichel_ober, schellen_seven])
+    trick_history = [[("teammate", gruen_eight), ("opp2", schellen_eight)]]
+    context = _context(
+        current_trick=[("teammate", gruen_sau)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opp1", "opp2"],
+        trick_history=trick_history,
+    )
+
+    result = choose_card_to_play(player, [eichel_ober, schellen_seven], context)
+
+    assert result == eichel_ober
+
+
+def test_follow_holds_suit_sau_back_when_a_threat_can_trump_it(
+    gruen_koenig, gruen_sau, gruen_seven, gruen_eight, schellen_eight, sauspiel_trumps
+):
+    # Teammate's Gruen Koenig is winning and we hold the Gruen Sau - but
+    # "opp2" is proven void of Gruen and may still hold trumps. Playing the
+    # Sau would feed its 11 points to the trump; duck cheaply instead.
+    player = _FakePlayer(player_cards=[gruen_sau, gruen_seven])
+    trick_history = [[("teammate", gruen_eight), ("opp2", schellen_eight)]]
+    context = _context(
+        current_trick=[("teammate", gruen_koenig)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opp1", "opp2"],
+        trick_history=trick_history,
+    )
+
+    result = choose_card_to_play(player, [gruen_sau, gruen_seven], context)
+
+    assert result == gruen_seven
+
+
+def test_follow_still_secures_teammate_trick_with_suit_sau_without_proven_threat(
+    gruen_koenig, gruen_sau, gruen_seven, sauspiel_trumps
+):
+    # Same spot without any proof that an opponent can trump: the Sau
+    # secures the trick against higher Gruen cards and adds 11 points.
+    player = _FakePlayer(player_cards=[gruen_sau, gruen_seven])
+    context = _context(
+        current_trick=[("teammate", gruen_koenig)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opp1", "opp2"],
+    )
+
+    result = choose_card_to_play(player, [gruen_sau, gruen_seven], context)
+
+    assert result == gruen_sau
+
+
+def test_follow_discard_sheds_blanc_card_to_work_towards_void(
+    herz_ober, eichel_eight, schellen_seven, schellen_eight, schellen_nine, sauspiel_trumps
+):
+    # Cannot win the trick and every discard is worth 0 points - shed the
+    # blanc Eichel Eight to create a void instead of the lower-power
+    # Schellen Seven from a three-card suit.
+    player = _FakePlayer(
+        player_cards=[eichel_eight, schellen_seven, schellen_eight, schellen_nine]
+    )
+    context = _context(
+        current_trick=[("opp", herz_ober)],
+        trumps=sauspiel_trumps,
+        teammates=["teammate"],
+        opponents=["opp"],
+    )
+
+    result = choose_card_to_play(
+        player, [eichel_eight, schellen_seven, schellen_eight, schellen_nine], context
+    )
+
+    assert result == eichel_eight

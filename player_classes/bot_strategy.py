@@ -199,6 +199,16 @@ def choose_preferred_game_mode(
 
     if can_pass:
         return None
+
+    # Forced to overbid with a hand that wanted none of the legal modes:
+    # pick the least-bad option. Wenz and Solo cost the same to lose
+    # (alone_price), so prefer whichever family fits the hand - a Solo in
+    # the bot's best color unless the hand is Unter-heavy - over blindly
+    # taking the lowest rank (which would always be Wenz).
+    for rank in (family_rank, other_rank, family_tout_rank, other_tout_rank):
+        mode = candidates_by_rank.get(rank)
+        if mode is not None:
+            return mode
     return min(candidates_by_rank.values(), key=lambda mode: mode.rank)
 
 
