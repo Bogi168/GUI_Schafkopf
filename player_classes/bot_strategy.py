@@ -22,6 +22,14 @@ _SAU_STRENGTH = 1.5
 # Sauspiel/Hochzeit material (see wants_to_play).
 _WANT_TO_PLAY_THRESHOLD = 8.0
 
+# Strength alone can be reached with two Obers and two Saus - only two
+# trumps. Measured over thousands of simulated games, such Sauspiele are
+# coin flips (2 trumps won 43%, 3 trumps 52%), while 4+ trumps won 62-94%.
+# A hand with exactly one trump is exempt: it cannot play a Sauspiel at
+# all, only offer a Hochzeit, where the trump count is fixed by rule.
+_SAUSPIEL_MIN_TRUMPS = 4
+_HOCHZEIT_CHOOSER_TRUMPS = 1
+
 # Doubling the game value happens after seeing only the first half of the
 # hand (4 of 8 cards) and raises the stakes for everyone, win or lose, for
 # the entire hand. That is only worth the risk if those 4 cards alone are
@@ -293,7 +301,15 @@ def wants_to_play(
     if players_who_want_to_play_count > 0:
         return False
 
-    return baseline_mode_playable and hand_strength(player_cards) >= _WANT_TO_PLAY_THRESHOLD
+    trumps = _solo_trump_count(player_cards, Color.HERZ)
+    return (
+        baseline_mode_playable
+        and hand_strength(player_cards) >= _WANT_TO_PLAY_THRESHOLD
+        and (
+            trumps >= _SAUSPIEL_MIN_TRUMPS
+            or trumps == _HOCHZEIT_CHOOSER_TRUMPS
+        )
+    )
 
 
 def wants_to_double_game_value(player_cards: list[Card]) -> bool:

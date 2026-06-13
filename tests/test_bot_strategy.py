@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from card_classes.Cards import Color, Type
+from card_classes.Cards import Card, Color, Type
 from game_classes.game_modes.Solo import Solo
 from game_classes.game_modes.Wenz import Wenz
 from input_validators.GameDecisionValidator import GameDecisionValidator
@@ -895,21 +895,22 @@ def test_wants_to_play_false_when_no_baseline_mode_playable(
     schellen_sau,
     eichel_ober,
     herz_ten,
+    herz_koenig,
     herz_seven,
-    eichel_seven,
     gruen_seven,
 ):
-    # Three Saus and an Ober: comfortably above the want-to-play threshold,
-    # but every callable color's Sau is in hand and three trumps rule out
-    # a Hochzeit - volunteering would force an unsuited Wenz/Solo.
+    # Three Saus, an Ober and four trumps: comfortably above the
+    # want-to-play threshold, but every callable color's Sau is in hand and
+    # four trumps rule out a Hochzeit - volunteering would force an
+    # unsuited Wenz/Solo.
     hand = [
         eichel_sau,
         gruen_sau,
         schellen_sau,
         eichel_ober,
         herz_ten,
+        herz_koenig,
         herz_seven,
-        eichel_seven,
         gruen_seven,
     ]
 
@@ -957,8 +958,8 @@ def test_bot_ask_want_choose_game_vetoes_hand_without_legal_baseline_mode(
     schellen_seven,
     eichel_ober,
     herz_ten,
+    herz_koenig,
     herz_seven,
-    eichel_seven,
     gruen_seven,
 ):
     bot = Bot(
@@ -967,15 +968,15 @@ def test_bot_ask_want_choose_game_vetoes_hand_without_legal_baseline_mode(
         game_decision_validator=GameDecisionValidator(choosable_game_rank_mapping={}),
     )
 
-    # All three Saus in hand: no callable color, three trumps: no Hochzeit.
+    # All three Saus in hand: no callable color, four trumps: no Hochzeit.
     bot.player_cards = [
         eichel_sau,
         gruen_sau,
         schellen_sau,
         eichel_ober,
         herz_ten,
+        herz_koenig,
         herz_seven,
-        eichel_seven,
         gruen_seven,
     ]
     assert bot.ask_want_choose_game(players_who_want_to_play_count=0) is False
@@ -987,8 +988,8 @@ def test_bot_ask_want_choose_game_vetoes_hand_without_legal_baseline_mode(
         schellen_seven,
         eichel_ober,
         herz_ten,
+        herz_koenig,
         herz_seven,
-        eichel_seven,
         gruen_seven,
     ]
     assert bot.ask_want_choose_game(players_who_want_to_play_count=0) is True
@@ -1197,3 +1198,38 @@ def test_is_solo_tout_worthy_needs_seven_trumps_top_obers_and_standing_sides(
     # An Eichel Ten without the Eichel Sau is not standing.
     broken_side = hand[:-1] + [eichel_ten]
     assert is_solo_tout_worthy(broken_side, trump_color=Color.HERZ) is False
+
+
+def test_wants_to_play_needs_four_trumps_for_a_sauspiel(
+    eichel_ober,
+    gruen_ober,
+    eichel_sau,
+    gruen_sau,
+    herz_seven,
+    schellen_seven,
+    schellen_eight,
+    schellen_nine,
+):
+    # Two Obers and two Saus reach the strength threshold with only three
+    # trumps - measured Sauspiele this thin are coin flips, so pass.
+    hand = [
+        eichel_ober,
+        gruen_ober,
+        eichel_sau,
+        gruen_sau,
+        herz_seven,
+        schellen_seven,
+        schellen_eight,
+        schellen_nine,
+    ]
+    assert (
+        wants_to_play(hand, players_who_want_to_play_count=0, baseline_mode_playable=True)
+        is False
+    )
+
+    # A fourth trump makes the same hand worth volunteering.
+    hand[4] = Card(Color.HERZ, Type.UNTER)
+    assert (
+        wants_to_play(hand, players_who_want_to_play_count=0, baseline_mode_playable=True)
+        is True
+    )
