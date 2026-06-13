@@ -15,6 +15,7 @@ from player_classes.Player import Bot
 from system.gui import constants as c
 from system.gui.renderer import GUIRenderer
 from system.gui.state import (
+    CardSlideAnimation,
     DealAnimation,
     PendingRequest,
     PlayedCardEntry,
@@ -234,9 +235,9 @@ def test_render_played_card_marks_bot_seat_active_then_clears(
 
     renderer.render_played_card(player=bot, card=eichel_sau)
 
-    # The seat is active while the bot "thinks" (during the sleep), then
-    # cleared once the card lands.
-    assert captured == [c.LEFT]
+    # The seat is active while the bot "thinks" (first sleep); by the time
+    # the card slides in (second sleep) the turn highlight is already off.
+    assert captured[0] == c.LEFT
     assert renderer.state.active_seat is None
 
 
@@ -275,6 +276,45 @@ def test_render_game_result_clears_active_seat(renderer, players):
 def test_draw_active_seat_ring_does_not_crash(renderer):
     for seat in (c.LEFT, c.TOP, c.RIGHT, c.BOTTOM):
         renderer.state.active_seat = seat
+        renderer.table_view.draw((0, 0))
+
+
+# ---------------------------------------------------------------------------
+# card-play slide animation
+# ---------------------------------------------------------------------------
+
+
+def test_render_played_card_slides_then_places_in_center(
+    renderer, player_1, eichel_sau, monkeypatch
+):
+    renderer.state.human_hand = [eichel_sau]
+    renderer.state.hand_sizes[c.BOTTOM] = 1
+    captured = []
+    monkeypatch.setattr(
+        "system.gui.renderer.time.sleep",
+        lambda *_args: captured.append(renderer.state.sliding_card),
+    )
+
+    # player_1 is not a bot, so the only sleep is the slide itself.
+    renderer.render_played_card(player=player_1, card=eichel_sau)
+
+    assert len(captured) == 1
+    in_flight = captured[0]
+    assert in_flight is not None
+    assert in_flight.seat == c.BOTTOM
+    assert in_flight.card == eichel_sau
+    # The card left the hand at the start of the slide...
+    assert renderer.state.human_hand == []
+    # ...and only joins the center once the slide finishes.
+    assert renderer.state.sliding_card is None
+    assert renderer.state.center_cards[-1].card == eichel_sau
+
+
+def test_draw_card_slide_does_not_crash(renderer, eichel_sau):
+    for seat in (c.BOTTOM, c.LEFT, c.TOP, c.RIGHT):
+        renderer.state.sliding_card = CardSlideAnimation(
+            seat=seat, card=eichel_sau, start_time=time.time(), duration=0.22
+        )
         renderer.table_view.draw((0, 0))
 
 

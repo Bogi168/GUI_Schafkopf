@@ -44,6 +44,16 @@ class SwapAnimation:
 
 
 @dataclass
+class CardSlideAnimation:
+    """A just-played card sliding face-up from a seat to its center slot."""
+
+    seat: int
+    card: Card
+    start_time: float
+    duration: float
+
+
+@dataclass
 class PendingRequest:
     """A blocking request for input from the human player."""
 
@@ -92,5 +102,8 @@ class TableState:
     dealing_card: DealAnimation | None = None
     # Hochzeit card-swap animation, written by render_hochzeit_card_swap.
     swap_animation: SwapAnimation | None = None
+    # A played card in flight from its seat to the center, written by
+    # render_played_card while it slides in (before it joins center_cards).
+    sliding_card: CardSlideAnimation | None = None
     # Set by GUIRenderer._run_game if the game-logic thread crashes.
     game_error: str | None = None

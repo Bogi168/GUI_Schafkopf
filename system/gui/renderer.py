@@ -23,6 +23,7 @@ from card_classes.Cards import Color
 from system.Renderer import ColorChoiceKind, Renderer, YesNoKind
 from system.gui import constants as c
 from system.gui.state import (
+    CardSlideAnimation,
     DealAnimation,
     PendingRequest,
     PlayedCardEntry,
@@ -65,6 +66,7 @@ _FAREWELL_DELAY = 8.0
 _SHUFFLE_DURATION = 1.0
 _DEAL_CARD_DURATION = 0.12
 _SWAP_CARD_DURATION = 0.9
+_PLAY_SLIDE_DURATION = 0.22
 
 
 class GUIRenderer(Renderer):
@@ -227,11 +229,19 @@ class GUIRenderer(Renderer):
                 self.state.active_seat = seat
             time.sleep(random.uniform(0.5, 1.0))
         with self.lock:
-            self.state.center_cards.append(PlayedCardEntry(seat=seat, card=card))
+            # The card leaves the hand now and slides toward the center; it
+            # joins center_cards only once the slide finishes.
             self.state.hand_sizes[seat] = max(0, self.state.hand_sizes[seat] - 1)
             if seat == c.BOTTOM and card in self.state.human_hand:
                 self.state.human_hand.remove(card)
             self.state.active_seat = None
+            self.state.sliding_card = CardSlideAnimation(
+                seat=seat, card=card, start_time=time.time(), duration=_PLAY_SLIDE_DURATION
+            )
+        time.sleep(_PLAY_SLIDE_DURATION)
+        with self.lock:
+            self.state.center_cards.append(PlayedCardEntry(seat=seat, card=card))
+            self.state.sliding_card = None
 
     def render_trick_winner(self, winner: Player) -> None:
         seat = self._ensure_seat(winner)

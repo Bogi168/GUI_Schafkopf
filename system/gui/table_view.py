@@ -109,6 +109,7 @@ class TableView:
             self._draw_bot_seat(c.RIGHT, mouse_pos)
             self._draw_human_seat(mouse_pos)
             self._draw_center()
+            self._draw_card_slide()
             self._draw_shuffle()
             self._draw_dealing_card()
             self._draw_swap_animation()
@@ -284,6 +285,22 @@ class TableView:
             _, height = c.HAND_CARD_SIZE
             return (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT - height // 2 - 20)
         return c.SEAT_HAND_CENTER[seat]
+
+    def _draw_card_slide(self) -> None:
+        slide = self.state.sliding_card
+        if slide is None:
+            return
+        progress = min(1.0, (time.time() - slide.start_time) / slide.duration)
+        eased = 1 - (1 - progress) ** 2
+        start_x, start_y = self._deal_target(slide.seat)
+        end_x, end_y = self._center_card_rect(slide.seat).center
+        width, height = c.CENTER_CARD_SIZE
+        rect = pygame.Rect(0, 0, width, height)
+        rect.center = (
+            start_x + (end_x - start_x) * eased,
+            start_y + (end_y - start_y) * eased,
+        )
+        draw_card_face(self.screen, rect, slide.card, self.fonts)
 
     def _draw_swap_animation(self) -> None:
         swap = self.state.swap_animation
