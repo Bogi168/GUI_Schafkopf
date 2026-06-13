@@ -22,7 +22,9 @@ from system.text import (
     show_played_card,
     show_collector_of_cards,
     tell_chosen_game_mode,
+    tell_hochzeit_card_swap,
     tell_player_doubles_game_value,
+    tell_player_hochzeit_partner_decision,
     tell_player_shoots,
     tell_player_wants_to_play,
     tell_player_chose_game_mode,
@@ -132,6 +134,23 @@ class Renderer(ABC):
     def render_shoot_decision(
         self, player: Player, shoots: bool, is_shoot_back: bool = False
     ) -> None:
+        pass
+
+    @abstractmethod
+    def render_hochzeit_partner_search(self, candidates: list[Player]) -> None:
+        """Called when a Hochzeit chooser starts looking for a partner,
+        before the candidates are asked one by one."""
+
+        pass
+
+    @abstractmethod
+    def render_hochzeit_partner_decision(self, player: Player, accepts: bool) -> None:
+        pass
+
+    @abstractmethod
+    def render_hochzeit_card_swap(self, chooser: Player, partner: Player) -> None:
+        """Called after both Hochzeit partners picked their swap card."""
+
         pass
 
     @abstractmethod
@@ -277,6 +296,23 @@ class ConsoleRenderer(Renderer):
                     player_name=player.player_name, is_shoot_back=is_shoot_back
                 )
             )
+
+    def render_hochzeit_partner_search(self, candidates: list[Player]) -> None:
+        pass
+
+    def render_hochzeit_partner_decision(self, player: Player, accepts: bool) -> None:
+        print(
+            tell_player_hochzeit_partner_decision(
+                player_name=player.player_name, accepts=accepts
+            )
+        )
+
+    def render_hochzeit_card_swap(self, chooser: Player, partner: Player) -> None:
+        print(
+            tell_hochzeit_card_swap(
+                chooser_name=chooser.player_name, partner_name=partner.player_name
+            )
+        )
 
     def render_game_mode_decision(self, player: Player, game_mode: type[Game] | None) -> None:
         print(

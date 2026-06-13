@@ -92,6 +92,10 @@ class Hochzeit(Game):
             )
             swap_cards.append(decision)
 
+        self.renderer.render_hochzeit_card_swap(
+            chooser=hochzeit_players[0], partner=hochzeit_players[1]
+        )
+
         card_a, card_b = swap_cards
         hochzeit_players[0].player_cards.append(card_b)
         hochzeit_players[1].player_cards.append(card_a)

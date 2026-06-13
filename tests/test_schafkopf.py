@@ -444,3 +444,23 @@ def test_main_single_iteration_with_game_plays_it(schafkopf, monkeypatch):
         detail_color=None,
     )
     renderer.render_farewell.assert_called_once_with(message=words_of_thanks)
+
+
+def test_get_hochzeit_partner_renders_search_and_decisions(schafkopf, monkeypatch):
+    starter, bot1, bot2, bot3 = schafkopf.players
+
+    monkeypatch.setattr(bot1, "ask_for_hochzeit", lambda: False)
+    monkeypatch.setattr(bot2, "ask_for_hochzeit", lambda: True)
+    monkeypatch.setattr(bot3, "ask_for_hochzeit", lambda: False)
+
+    schafkopf.get_hochzeit_partner(game_chooser=starter)
+
+    schafkopf.renderer.render_hochzeit_partner_search.assert_called_once_with(
+        candidates=[bot1, bot2, bot3]
+    )
+    decision_calls = schafkopf.renderer.render_hochzeit_partner_decision.call_args_list
+    # bot3 is never asked - bot2 already accepted.
+    assert [(call.kwargs["player"], call.kwargs["accepts"]) for call in decision_calls] == [
+        (bot1, False),
+        (bot2, True),
+    ]

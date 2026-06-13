@@ -11,7 +11,7 @@ from game_classes.game_modes.Sauspiel import Sauspiel
 from game_classes.game_modes.Wenz import Wenz
 from system.gui import constants as c
 from system.gui.renderer import GUIRenderer
-from system.gui.state import DealAnimation, PlayedCardEntry
+from system.gui.state import DealAnimation, PlayedCardEntry, SwapAnimation
 from system.gui.widgets import wrap_text
 from system.Renderer import ColorChoiceKind, GameResult, YesNoKind
 from system.text import (
@@ -617,3 +617,70 @@ def test_wrap_text_empty_string_returns_single_empty_line(renderer):
     lines = wrap_text("", renderer.fonts.heading, 100)
 
     assert lines == [""]
+
+
+def test_render_hochzeit_partner_search_shows_pending_lamps_for_bot_candidates(
+    renderer, players
+):
+    # players[0] is the human chooser; the three bots are the candidates.
+    renderer.render_hochzeit_partner_search(candidates=players[1:])
+
+    assert renderer.state.game_choice_lamps == {
+        c.LEFT: "pending",
+        c.TOP: "pending",
+        c.RIGHT: "pending",
+    }
+
+
+def test_render_hochzeit_partner_search_excludes_the_bot_chooser(renderer, players):
+    # players[1] (seat LEFT) chose the Hochzeit - only the other three are
+    # candidates, including the human, who gets no lamp.
+    candidates = [players[2], players[3], players[0]]
+
+    renderer.render_hochzeit_partner_search(candidates=candidates)
+
+    assert renderer.state.game_choice_lamps == {c.TOP: "pending", c.RIGHT: "pending"}
+
+
+def test_render_hochzeit_partner_decision_sets_lamp_and_announces(
+    renderer, players, player_2
+):
+    renderer.render_hochzeit_partner_search(candidates=players[1:])
+    calls = []
+    renderer._announce_choice = lambda *args, **kwargs: calls.append((args, kwargs))
+
+    renderer.render_hochzeit_partner_decision(player=players[1], accepts=False)
+    renderer.render_hochzeit_partner_decision(player=players[2], accepts=True)
+
+    assert renderer.state.game_choice_lamps[c.LEFT] == "no"
+    assert renderer.state.game_choice_lamps[c.TOP] == "yes"
+    assert calls == [
+        (("Testplayer 2 does not want to partner the Hochzeit.",), {}),
+        (("Testplayer 3 partners the Hochzeit!",), {}),
+    ]
+
+
+def test_render_hochzeit_card_swap_animates_between_the_partner_seats(
+    renderer, players, monkeypatch
+):
+    snapshots = []
+    monkeypatch.setattr(
+        "system.gui.renderer.time.sleep",
+        lambda *_args: snapshots.append(renderer.state.swap_animation),
+    )
+
+    renderer.render_hochzeit_card_swap(chooser=players[0], partner=players[2])
+
+    assert len(snapshots) == 1
+    assert snapshots[0] is not None
+    assert snapshots[0].seat_a == c.BOTTOM
+    assert snapshots[0].seat_b == c.TOP
+    assert renderer.state.swap_animation is None
+
+
+def test_draw_swap_animation_does_not_crash_while_active(renderer):
+    renderer.state.swap_animation = SwapAnimation(
+        seat_a=c.BOTTOM, seat_b=c.TOP, start_time=time.time(), duration=0.9
+    )
+
+    renderer.table_view.draw(mouse_pos=(0, 0))

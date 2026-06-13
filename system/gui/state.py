@@ -34,6 +34,16 @@ class DealAnimation:
 
 
 @dataclass
+class SwapAnimation:
+    """Two face-down cards sliding between the Hochzeit partners' seats."""
+
+    seat_a: int
+    seat_b: int
+    start_time: float
+    duration: float
+
+
+@dataclass
 class PendingRequest:
     """A blocking request for input from the human player."""
 
@@ -77,5 +87,7 @@ class TableState:
     shuffle_start_time: float | None = None
     shuffle_duration: float = 0.0
     dealing_card: DealAnimation | None = None
+    # Hochzeit card-swap animation, written by render_hochzeit_card_swap.
+    swap_animation: SwapAnimation | None = None
     # Set by GUIRenderer._run_game if the game-logic thread crashes.
     game_error: str | None = None

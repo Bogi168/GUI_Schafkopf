@@ -22,7 +22,13 @@ import pygame
 from card_classes.Cards import Color
 from system.Renderer import ColorChoiceKind, Renderer, YesNoKind
 from system.gui import constants as c
-from system.gui.state import DealAnimation, PendingRequest, PlayedCardEntry, TableState
+from system.gui.state import (
+    DealAnimation,
+    PendingRequest,
+    PlayedCardEntry,
+    SwapAnimation,
+    TableState,
+)
 from system.gui.table_view import TableView
 from system.text import (
     prompt_ask_for_hochzeit,
@@ -33,6 +39,7 @@ from system.text import (
     prompt_ask_to_double_game_value,
     tell_player_chose_game_mode,
     tell_player_doubles_game_value,
+    tell_player_hochzeit_partner_decision,
     tell_player_shoots,
     tell_player_wants_to_play,
 )
@@ -57,6 +64,7 @@ _CHOICE_ANNOUNCEMENT_DELAY = 1.6
 _FAREWELL_DELAY = 8.0
 _SHUFFLE_DURATION = 1.0
 _DEAL_CARD_DURATION = 0.12
+_SWAP_CARD_DURATION = 0.9
 
 
 class GUIRenderer(Renderer):
@@ -301,6 +309,42 @@ class GUIRenderer(Renderer):
                     player_name=player.player_name, is_shoot_back=is_shoot_back
                 )
             )
+
+    def render_hochzeit_partner_search(self, candidates: list[Player]) -> None:
+        # Partner selection is a fresh decision round: show a blue
+        # "pending" lamp next to every bot still to be asked.
+        candidate_seats = {self._ensure_seat(player) for player in candidates}
+        with self.lock:
+            self.state.game_choice_lamps = {
+                seat: "pending"
+                for seat in (c.LEFT, c.TOP, c.RIGHT)
+                if seat in candidate_seats
+            }
+
+    def render_hochzeit_partner_decision(self, player: Player, accepts: bool) -> None:
+        seat = self._ensure_seat(player)
+        with self.lock:
+            if seat in self.state.game_choice_lamps:
+                self.state.game_choice_lamps[seat] = "yes" if accepts else "no"
+        self._announce_choice(
+            tell_player_hochzeit_partner_decision(
+                player_name=player.player_name, accepts=accepts
+            )
+        )
+
+    def render_hochzeit_card_swap(self, chooser: Player, partner: Player) -> None:
+        seat_a = self._ensure_seat(chooser)
+        seat_b = self._ensure_seat(partner)
+        with self.lock:
+            self.state.swap_animation = SwapAnimation(
+                seat_a=seat_a,
+                seat_b=seat_b,
+                start_time=time.time(),
+                duration=_SWAP_CARD_DURATION,
+            )
+        time.sleep(_SWAP_CARD_DURATION)
+        with self.lock:
+            self.state.swap_animation = None
 
     def render_game_mode_decision(self, player: Player, game_mode: type[Game] | None) -> None:
         self._announce_choice(

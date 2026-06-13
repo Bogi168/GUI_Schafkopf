@@ -138,8 +138,12 @@ class Schafkopf:
         temp_players: list[Player] = self.sort_players(
             starter=game_chooser, players=self.players
         )[1:]
+        self.renderer.render_hochzeit_partner_search(candidates=temp_players)
         for player in temp_players:
             decision: bool = player.ask_for_hochzeit()
+            self.renderer.render_hochzeit_partner_decision(
+                player=player, accepts=decision
+            )
             if decision:
                 return player
         return None

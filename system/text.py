@@ -88,6 +88,17 @@ def tell_player_doubles_game_value(player_name: str) -> str:
     return f"{player_name} doubles the game value!"
 
 
+def tell_player_hochzeit_partner_decision(player_name: str, accepts: bool) -> str:
+    if accepts:
+        return f"{player_name} partners the Hochzeit!"
+    else:
+        return f"{player_name} does not want to partner the Hochzeit."
+
+
+def tell_hochzeit_card_swap(chooser_name: str, partner_name: str) -> str:
+    return f"{chooser_name} and {partner_name} swap a card."
+
+
 def tell_player_shoots(player_name: str, is_shoot_back: bool = False) -> str:
     if is_shoot_back:
         return f"{player_name} shoots back!"

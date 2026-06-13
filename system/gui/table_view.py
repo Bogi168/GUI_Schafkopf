@@ -101,6 +101,7 @@ class TableView:
             self._draw_center()
             self._draw_shuffle()
             self._draw_dealing_card()
+            self._draw_swap_animation()
             self._draw_game_mode_badge()
 
             if self.state.choice_announcement:
@@ -236,6 +237,24 @@ class TableView:
             _, height = c.HAND_CARD_SIZE
             return (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT - height // 2 - 20)
         return c.SEAT_HAND_CENTER[seat]
+
+    def _draw_swap_animation(self) -> None:
+        swap = self.state.swap_animation
+        if swap is None:
+            return
+        progress = min(1.0, (time.time() - swap.start_time) / swap.duration)
+        eased = 1 - (1 - progress) ** 2
+        pos_a = self._deal_target(swap.seat_a)
+        pos_b = self._deal_target(swap.seat_b)
+        width, height = c.BACK_CARD_SIZE
+        # Two face-down cards pass each other between the partners' hands.
+        for (start_x, start_y), (end_x, end_y) in ((pos_a, pos_b), (pos_b, pos_a)):
+            rect = pygame.Rect(0, 0, width, height)
+            rect.center = (
+                start_x + (end_x - start_x) * eased,
+                start_y + (end_y - start_y) * eased,
+            )
+            draw_card_back(self.screen, rect)
 
     def _draw_game_mode_badge(self) -> None:
         game_mode = self.state.current_game_mode

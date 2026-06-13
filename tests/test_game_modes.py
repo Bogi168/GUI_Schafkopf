@@ -174,3 +174,26 @@ def test_ramsch_gather_kwargs(schafkopf):
         "amount_game_value_doubles",
         "alone_price",
     }
+
+
+def test_hochzeit_card_swap_renders_the_swap_after_both_picks(
+    schafkopf, player_1, player_2, monkeypatch, eichel_seven, herz_ober
+):
+    monkeypatch.setattr(
+        schafkopf, "get_hochzeit_partner", lambda game_chooser: player_2
+    )
+    game = Hochzeit(**Hochzeit.gather_kwargs(chooser=player_1, schafkopf=schafkopf))
+    monkeypatch.setattr(
+        player_1, "get_card_swap_decision", lambda move_validator: herz_ober
+    )
+    monkeypatch.setattr(
+        player_2, "get_card_swap_decision", lambda move_validator: eichel_seven
+    )
+
+    game.create_teams()
+
+    game.renderer.render_hochzeit_card_swap.assert_called_once_with(
+        chooser=player_1, partner=player_2
+    )
+    assert herz_ober in player_2.player_cards
+    assert eichel_seven in player_1.player_cards
