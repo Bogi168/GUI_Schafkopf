@@ -258,20 +258,21 @@ def test_wants_to_double_game_value_true_for_very_strong_half_hand(
 
 
 def test_wants_to_double_game_value_true_at_threshold(
-    eichel_unter, gruen_unter, herz_unter, schellen_unter
+    eichel_ober, eichel_unter, eichel_seven, eichel_eight
 ):
-    # All 4 Unter = 8.0, exactly at the threshold.
-    half_hand = [eichel_unter, gruen_unter, herz_unter, schellen_unter]
+    # 1 Ober + 1 Unter = 5.0, exactly at the threshold - an above-average
+    # half-hand the A/B data shows is already worth doubling.
+    half_hand = [eichel_ober, eichel_unter, eichel_seven, eichel_eight]
 
     assert wants_to_double_game_value(half_hand) is True
 
 
-def test_wants_to_double_game_value_false_for_decent_but_not_great_half_hand(
-    eichel_ober, eichel_unter, eichel_sau, eichel_koenig
+def test_wants_to_double_game_value_false_just_below_threshold(
+    eichel_ober, eichel_sau, eichel_seven, eichel_eight
 ):
-    # 1 Ober + 1 Unter + 1 Sau + filler = 6.5 - a fine start, but not the
-    # "very very good" hand needed to risk doubling the stakes.
-    half_hand = [eichel_ober, eichel_unter, eichel_sau, eichel_koenig]
+    # 1 Ober + 1 non-trump Sau = 4.5, just below the threshold - barely
+    # below average, where doubling no longer pays.
+    half_hand = [eichel_ober, eichel_sau, eichel_seven, eichel_eight]
 
     assert wants_to_double_game_value(half_hand) is False
 

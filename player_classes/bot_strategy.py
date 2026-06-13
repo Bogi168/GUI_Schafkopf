@@ -31,12 +31,14 @@ _SAUSPIEL_MIN_TRUMPS = 4
 _HOCHZEIT_CHOOSER_TRUMPS = 1
 
 # Doubling the game value happens after seeing only the first half of the
-# hand (4 of 8 cards) and raises the stakes for everyone, win or lose, for
-# the entire hand. That is only worth the risk if those 4 cards alone are
-# already as strong as a full 8-card hand most bots would be happy to play
-# (see _WANT_TO_PLAY_THRESHOLD) - a rare sign that the completed hand will
-# be very good for a Sauspiel.
-_DOUBLE_GAME_VALUE_THRESHOLD = _WANT_TO_PLAY_THRESHOLD
+# hand (4 of 8 cards) and amplifies this player's final outcome, win or
+# lose. A clean A/B over thousands of simulated games (force-double vs
+# force-not, bucketed by the strength of those 4 cards) showed the marginal
+# effect of doubling turning positive at strength ~4 and rising steeply
+# (+13 cents at 4-5, +35 at 6-7, +99 at 8-9): an above-average half-hand is
+# already more likely than not to come out ahead, so doubling pays. The
+# threshold sits just above the noisy break-even region.
+_DOUBLE_GAME_VALUE_THRESHOLD = 5.0
 
 # Solo viability, measured over thousands of simulated bot games: the
 # chooser's trump count dominates the outcome (5 trumps won 24%, 6 trumps
