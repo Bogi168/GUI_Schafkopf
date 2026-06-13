@@ -79,6 +79,17 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 HIGHLIGHT = (255, 215, 0)
 
+# Whose-turn indicator: a pulsing ring around the seat currently to act.
+# A cyan distinct from the gold HIGHLIGHT used for the trick winner, so the
+# two never read as the same thing.
+TURN_HIGHLIGHT = (95, 205, 255)
+TURN_HIGHLIGHT_DIM = (35, 95, 135)
+
+# Affordance for the human's own legal cards while it is their turn: a gold
+# outline marks every playable card; the card under the mouse lifts up.
+LEGAL_CARD_HIGHLIGHT = (255, 215, 0)
+HAND_HOVER_LIFT = 20
+
 # "Lamp" indicator shown next to a bot's avatar while it decides whether to
 # choose the game. LAMP_GREEN is a brighter, bluer green than TABLE_GREEN so
 # it stands out against the table.

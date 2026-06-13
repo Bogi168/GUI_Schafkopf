@@ -221,12 +221,17 @@ class GUIRenderer(Renderer):
     def render_played_card(self, player: Player, card: Card) -> None:
         seat = self._ensure_seat(player)
         if player.is_bot:
+            # Mark the bot as the one to act while it "thinks", so the table
+            # shows whose turn it is before the card drops.
+            with self.lock:
+                self.state.active_seat = seat
             time.sleep(random.uniform(0.5, 1.0))
         with self.lock:
             self.state.center_cards.append(PlayedCardEntry(seat=seat, card=card))
             self.state.hand_sizes[seat] = max(0, self.state.hand_sizes[seat] - 1)
             if seat == c.BOTTOM and card in self.state.human_hand:
                 self.state.human_hand.remove(card)
+            self.state.active_seat = None
 
     def render_trick_winner(self, winner: Player) -> None:
         seat = self._ensure_seat(winner)
@@ -271,6 +276,7 @@ class GUIRenderer(Renderer):
             self.state.game_result = result
             self.state.center_cards.clear()
             self.state.trick_winner_seat = None
+            self.state.active_seat = None
             self.state.message = ""
             # The hand is over - the "show last round" button must not offer
             # this hand's last trick while the player is asked to play again.
@@ -447,6 +453,10 @@ class GUIRenderer(Renderer):
         is_swap: bool = False,
     ) -> int:
         title = "Choose a card to swap" if is_swap else "Choose a card to play"
+        if not is_swap:
+            # Playing a card is the human's turn - light up their seat too.
+            with self.lock:
+                self.state.active_seat = c.BOTTOM
         return self._request(
             kind="card",
             player_name=player.player_name,

@@ -69,6 +69,16 @@ class TableView:
             previous_round_button=self._previous_round_button,
         )
 
+    @staticmethod
+    def _turn_pulse_color() -> tuple[int, int, int]:
+        """A cyan that pulses over time for the whose-turn ring."""
+
+        t = 0.5 + 0.5 * math.sin(time.time() * 4.5)
+        return tuple(
+            int(lo + (hi - lo) * t)
+            for lo, hi in zip(c.TURN_HIGHLIGHT_DIM, c.TURN_HIGHLIGHT)
+        )
+
     @property
     def text_input_value(self) -> str:
         return self._text_input.text.strip().capitalize()
@@ -97,7 +107,7 @@ class TableView:
             self._draw_bot_seat(c.LEFT, mouse_pos)
             self._draw_bot_seat(c.TOP, mouse_pos)
             self._draw_bot_seat(c.RIGHT, mouse_pos)
-            self._draw_human_seat()
+            self._draw_human_seat(mouse_pos)
             self._draw_center()
             self._draw_shuffle()
             self._draw_dealing_card()
@@ -131,6 +141,14 @@ class TableView:
 
         if self.state.trick_winner_seat == seat:
             pygame.draw.rect(self.screen, c.HIGHLIGHT, avatar_rect.inflate(8, 8), width=4, border_radius=8)
+        elif self.state.active_seat == seat:
+            pygame.draw.rect(
+                self.screen,
+                self._turn_pulse_color(),
+                avatar_rect.inflate(12, 12),
+                width=4,
+                border_radius=10,
+            )
 
         image = get_bot_image(name, c.AVATAR_SIZE)
         if image is not None:
@@ -172,7 +190,7 @@ class TableView:
                 rect = pygame.Rect(center_x - width // 2, start_y + i * spacing, width, height)
                 draw_card_back(self.screen, rect)
 
-    def _draw_human_seat(self) -> None:
+    def _draw_human_seat(self, mouse_pos: tuple[int, int]) -> None:
         name = self.state.seat_names[c.BOTTOM] or "You"
         player = self.state.seat_players[c.BOTTOM]
         label = name if player is None else f"{name} ({player.money}¢)"
@@ -181,16 +199,45 @@ class TableView:
         if self.state.trick_winner_seat == c.BOTTOM:
             highlight_rect = name_surf.get_rect(center=name_pos).inflate(24, 12)
             pygame.draw.rect(self.screen, c.HIGHLIGHT, highlight_rect, border_radius=8)
+        elif self.state.active_seat == c.BOTTOM:
+            highlight_rect = name_surf.get_rect(center=name_pos).inflate(24, 12)
+            pygame.draw.rect(
+                self.screen, self._turn_pulse_color(), highlight_rect, width=3, border_radius=8
+            )
         self.screen.blit(name_surf, name_surf.get_rect(center=name_pos))
 
         cards = self.state.human_hand
         rects = self._hand_card_rects(len(cards))
         pending = self.state.pending
         legal_mask = pending.legal_mask if pending and pending.kind == "card" else None
-        for index, (card, rect) in enumerate(zip(cards, rects)):
-            dim = legal_mask is not None and not legal_mask[index]
-            draw_card_face(self.screen, rect, card, self.fonts, dim=dim)
+
+        # While it is the human's turn, the card under the mouse (if legal)
+        # lifts up to signal it is the one that will be played.
+        hovered = None
         if legal_mask is not None:
+            for index, rect in enumerate(rects):
+                if legal_mask[index] and rect.collidepoint(mouse_pos):
+                    hovered = index
+
+        for index, (card, rect) in enumerate(zip(cards, rects)):
+            legal = legal_mask is not None and legal_mask[index]
+            dim = legal_mask is not None and not legal_mask[index]
+            draw_rect = rect.move(0, -c.HAND_HOVER_LIFT) if index == hovered else rect
+            draw_card_face(self.screen, draw_rect, card, self.fonts, dim=dim)
+            if legal:
+                # Gold outline marks every playable card; thicker when hovered.
+                pygame.draw.rect(
+                    self.screen,
+                    c.LEGAL_CARD_HIGHLIGHT,
+                    draw_rect.inflate(6, 6),
+                    width=4 if index == hovered else 2,
+                    border_radius=12,
+                )
+
+        if legal_mask is not None:
+            # Hit-testing stays on the base rects: while a card is hovered the
+            # cursor is within its base rect, so clicks register even though
+            # the card is drawn lifted.
             self._current_card_rects = rects
 
     def _draw_center(self) -> None:

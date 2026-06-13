@@ -67,6 +67,9 @@ class TableState:
     previous_round_cards: list[PlayedCardEntry] = field(default_factory=list)
     show_previous_round: bool = False
     trick_winner_seat: int | None = None
+    # Seat currently to act (a bot "thinking" before its card drops, or the
+    # human while the play-a-card request is pending). None between turns.
+    active_seat: int | None = None
     current_game_mode: str | None = None
     current_game_mode_chooser_seat: int | None = None
     current_game_mode_detail: str | None = None

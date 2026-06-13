@@ -4,14 +4,22 @@ import time
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from card_classes.Cards import Color
 from game_classes.game_modes.Sauspiel import Sauspiel
 from game_classes.game_modes.Wenz import Wenz
+from player_classes.Player import Bot
 from system.gui import constants as c
 from system.gui.renderer import GUIRenderer
-from system.gui.state import DealAnimation, PlayedCardEntry, SwapAnimation
+from system.gui.state import (
+    DealAnimation,
+    PendingRequest,
+    PlayedCardEntry,
+    SwapAnimation,
+)
 from system.gui.widgets import wrap_text
 from system.Renderer import ColorChoiceKind, GameResult, YesNoKind
 from system.text import (
@@ -202,6 +210,105 @@ def test_draw_bot_seat_with_lamp_does_not_crash(renderer):
     renderer.render_game_mode(game_mode_name=None, chooser=None)
 
     renderer.table_view.draw((0, 0))
+
+
+# ---------------------------------------------------------------------------
+# whose-turn indicator
+# ---------------------------------------------------------------------------
+
+
+def test_render_played_card_marks_bot_seat_active_then_clears(
+    renderer, eichel_sau, monkeypatch
+):
+    # A real Bot whose name matches the seat-1 (LEFT) registration.
+    bot = Bot(
+        bot_name="Testplayer 2",
+        renderer=MagicMock(),
+        game_decision_validator=MagicMock(),
+    )
+    captured = []
+    monkeypatch.setattr(
+        "system.gui.renderer.time.sleep",
+        lambda *_args: captured.append(renderer.state.active_seat),
+    )
+
+    renderer.render_played_card(player=bot, card=eichel_sau)
+
+    # The seat is active while the bot "thinks" (during the sleep), then
+    # cleared once the card lands.
+    assert captured == [c.LEFT]
+    assert renderer.state.active_seat is None
+
+
+def test_ask_card_marks_human_seat_active(renderer, player_1, monkeypatch):
+    monkeypatch.setattr(renderer, "_request", lambda **_kwargs: 0)
+
+    renderer.ask_card(player=player_1, player_cards=[], legal_mask=[True])
+
+    assert renderer.state.active_seat == c.BOTTOM
+
+
+def test_ask_card_swap_does_not_mark_turn(renderer, player_1, monkeypatch):
+    monkeypatch.setattr(renderer, "_request", lambda **_kwargs: 0)
+
+    renderer.ask_card(player=player_1, player_cards=[], legal_mask=[True], is_swap=True)
+
+    assert renderer.state.active_seat is None
+
+
+def test_render_game_result_clears_active_seat(renderer, players):
+    renderer.state.active_seat = c.LEFT
+
+    renderer.render_game_result(
+        result=GameResult(
+            most_point_teams=[],
+            winners=[],
+            game_value=0,
+            game_value_breakdown="",
+            players=players,
+        )
+    )
+
+    assert renderer.state.active_seat is None
+
+
+def test_draw_active_seat_ring_does_not_crash(renderer):
+    for seat in (c.LEFT, c.TOP, c.RIGHT, c.BOTTOM):
+        renderer.state.active_seat = seat
+        renderer.table_view.draw((0, 0))
+
+
+# ---------------------------------------------------------------------------
+# legal-card affordance on the human hand
+# ---------------------------------------------------------------------------
+
+
+def test_draw_human_hand_with_legal_mask_and_hover_does_not_crash(
+    renderer, eichel_sau, gruen_sau, herz_sau
+):
+    renderer.state.human_hand = [eichel_sau, gruen_sau, herz_sau]
+    renderer.state.pending = PendingRequest(kind="card", legal_mask=[True, False, True])
+
+    base_rects = renderer.table_view._hand_card_rects(3)
+    # Hover the first (legal) card.
+    renderer.table_view.draw(base_rects[0].center)
+
+    # Hit-testing exposes the base rects in card order, regardless of the
+    # cosmetic hover lift.
+    assert renderer.table_view.hit_test().card_rects == base_rects
+
+
+def test_draw_human_hand_hovering_illegal_card_does_not_crash(
+    renderer, eichel_sau, gruen_sau
+):
+    renderer.state.human_hand = [eichel_sau, gruen_sau]
+    renderer.state.pending = PendingRequest(kind="card", legal_mask=[False, True])
+
+    base_rects = renderer.table_view._hand_card_rects(2)
+    # Hovering an illegal card must not lift it or break drawing.
+    renderer.table_view.draw(base_rects[0].center)
+
+    assert renderer.table_view.hit_test().card_rects == base_rects
 
 
 def test_ask_play_again_clears_no_game_message(renderer, monkeypatch):
