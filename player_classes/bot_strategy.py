@@ -32,12 +32,13 @@ _HOCHZEIT_CHOOSER_TRUMPS = 1
 
 # Doubling the game value happens after seeing only the first half of the
 # hand (4 of 8 cards) and amplifies this player's final outcome, win or
-# lose. A clean A/B over thousands of simulated games (force-double vs
-# force-not, bucketed by the strength of those 4 cards) showed the marginal
-# effect of doubling turning positive at strength ~4 and rising steeply
-# (+13 cents at 4-5, +35 at 6-7, +99 at 8-9): an above-average half-hand is
-# already more likely than not to come out ahead, so doubling pays. The
-# threshold sits just above the noisy break-even region.
+# lose. The threshold was tuned by a best-response sweep: one bot's
+# threshold varied against three reference bots, measuring the varied bot's
+# own EV in real play. A naive force-double-vs-not A/B overstates low
+# thresholds because it doubles opponents at random, breaking the real
+# correlation that opponents double exactly when they are strong (and you
+# are about to lose) - doubling is a shared multiplier, so that correlation
+# matters. The best response settles here.
 _DOUBLE_GAME_VALUE_THRESHOLD = 5.0
 
 # Solo viability, measured over thousands of simulated bot games: the
@@ -91,12 +92,15 @@ _TOP_OBER_COLORS = (Color.EICHEL, Color.GRUEN, Color.HERZ)
 # Wenz/WenzTout: there are only 4 Unter trumps in total.
 _WENZ_TRUMP_COUNT = 4
 
-# Sauspiel/Hochzeit/Solo (non-Tout) shooting: a strict trump majority (8+ of
-# 14) is far too rare to be useful. "6 trumps including some of the higher
-# Obers" is already a clear edge - e.g. the 2 highest Obers
-# (2 * _OBER_STRENGTH = 6.0) plus 4 more trump-color cards
-# (4 * _TRUMP_HERZ_STRENGTH = 4.0) reach this threshold.
-_SHOOT_THRESHOLD_NORMAL = 10.0
+# Sauspiel/Hochzeit/Solo (non-Tout) shooting. Shooting doubles the stake and
+# flips the active team, so like doubling it must be tuned by a best-response
+# sweep, not a 50/50 A/B (which overstates aggression by shooting opponents
+# at random instead of when they are strong). The sweep - one bot's shoot
+# threshold varied against three reference bots, measuring its own EV - rises
+# steeply to a flat plateau from ~11 upward (+2.2 cents at 11, vs +1.3 at 10
+# and -1.3 at 9): shooting only pays on a genuinely dominant trump holding,
+# e.g. 2 Obers plus 5 trump-color cards, or 3 Obers plus 2 more trumps.
+_SHOOT_THRESHOLD_NORMAL = 11.0
 
 # Game mode ranks (see game_classes/game_modes/*.py): higher outranks lower.
 _SAUSPIEL_RANK = 2

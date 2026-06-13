@@ -287,8 +287,7 @@ def test_wants_to_double_game_value_true_for_very_strong_half_hand(
 def test_wants_to_double_game_value_true_at_threshold(
     eichel_ober, eichel_unter, eichel_seven, eichel_eight
 ):
-    # 1 Ober + 1 Unter = 5.0, exactly at the threshold - an above-average
-    # half-hand the A/B data shows is already worth doubling.
+    # 1 Ober + 1 Unter = 5.0, exactly at the best-response threshold.
     half_hand = [eichel_ober, eichel_unter, eichel_seven, eichel_eight]
 
     assert wants_to_double_game_value(half_hand) is True
@@ -297,8 +296,7 @@ def test_wants_to_double_game_value_true_at_threshold(
 def test_wants_to_double_game_value_false_just_below_threshold(
     eichel_ober, eichel_sau, eichel_seven, eichel_eight
 ):
-    # 1 Ober + 1 non-trump Sau = 4.5, just below the threshold - barely
-    # below average, where doubling no longer pays.
+    # 1 Ober + 1 non-trump Sau = 4.5, just below the threshold.
     half_hand = [eichel_ober, eichel_sau, eichel_seven, eichel_eight]
 
     assert wants_to_double_game_value(half_hand) is False
@@ -383,25 +381,25 @@ def test_wants_to_shoot_true_with_majority_of_trumps(sauspiel_trumps):
 def test_wants_to_shoot_true_at_normal_threshold(
     eichel_ober,
     gruen_ober,
+    herz_ober,
     herz_sau,
     herz_ten,
-    herz_koenig,
-    herz_nine,
     eichel_seven,
     gruen_seven,
+    schellen_seven,
     sauspiel_trumps,
 ):
-    # 2 Ober (6.0) + 4 Herz trumps (4.0) = 10.0 - exactly "6 trumps with
-    # some of the higher Obers".
+    # 3 Ober (9.0) + 2 Herz trumps (2.0) = 11.0 - exactly the best-response
+    # threshold: a genuinely dominant trump holding.
     hand = [
         eichel_ober,
         gruen_ober,
+        herz_ober,
         herz_sau,
         herz_ten,
-        herz_koenig,
-        herz_nine,
         eichel_seven,
         gruen_seven,
+        schellen_seven,
     ]
 
     assert wants_to_shoot(hand, sauspiel_trumps) is True
@@ -409,26 +407,25 @@ def test_wants_to_shoot_true_at_normal_threshold(
 
 def test_wants_to_shoot_false_below_normal_threshold(
     eichel_ober,
-    eichel_unter,
-    herz_sau,
-    herz_ten,
-    herz_koenig,
-    herz_nine,
-    eichel_seven,
+    gruen_ober,
+    herz_ober,
+    eichel_sau,
     gruen_seven,
+    schellen_seven,
+    eichel_seven,
+    eichel_eight,
     sauspiel_trumps,
 ):
-    # 1 Ober (3.0) + 1 Unter (2.0) + 4 Herz trumps (4.0) = 9.0 - just below
-    # the threshold.
+    # 3 Ober (9.0) + 1 non-trump Sau (1.5) = 10.5 - just below the threshold.
     hand = [
         eichel_ober,
-        eichel_unter,
-        herz_sau,
-        herz_ten,
-        herz_koenig,
-        herz_nine,
-        eichel_seven,
+        gruen_ober,
+        herz_ober,
+        eichel_sau,
         gruen_seven,
+        schellen_seven,
+        eichel_seven,
+        eichel_eight,
     ]
 
     assert wants_to_shoot(hand, sauspiel_trumps) is False
@@ -604,6 +601,7 @@ def test_wants_to_shoot_wenz_tout_true_with_three_lower_trumps(
 def test_bot_ask_shoot_delegates_to_wants_to_shoot(
     eichel_ober,
     gruen_ober,
+    herz_ober,
     eichel_unter,
     herz_sau,
     herz_ten,
@@ -611,18 +609,19 @@ def test_bot_ask_shoot_delegates_to_wants_to_shoot(
     herz_nine,
     eichel_seven,
     gruen_seven,
+    schellen_seven,
     sauspiel_trumps,
 ):
     strong_hand = [
         eichel_ober,
         gruen_ober,
+        herz_ober,
         herz_sau,
         herz_ten,
-        herz_koenig,
-        herz_nine,
         eichel_seven,
         gruen_seven,
-    ]
+        schellen_seven,
+    ]  # 3 Ober + 2 Herz trumps = 11.0
     weak_hand = [
         eichel_ober,
         eichel_unter,
@@ -632,7 +631,7 @@ def test_bot_ask_shoot_delegates_to_wants_to_shoot(
         herz_nine,
         eichel_seven,
         gruen_seven,
-    ]
+    ]  # 1 Ober + 1 Unter + 4 Herz trumps = 9.0
 
     assert _bot(strong_hand).ask_shoot(trumps=sauspiel_trumps) is True
     assert _bot(weak_hand).ask_shoot(trumps=sauspiel_trumps) is False
