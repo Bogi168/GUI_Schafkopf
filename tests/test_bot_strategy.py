@@ -209,8 +209,8 @@ def test_wants_to_play_ramsch_true_for_blanc_sau_alone(
 
 
 def test_wants_to_play_ramsch_false_when_blanc_sau_tips_a_trumpy_hand(
+    eichel_ober,
     eichel_unter,
-    herz_sau,
     herz_koenig,
     gruen_seven,
     gruen_eight,
@@ -219,10 +219,11 @@ def test_wants_to_play_ramsch_false_when_blanc_sau_tips_a_trumpy_hand(
     gruen_ten,
     schellen_sau,
 ):
-    # 1 Unter + 2 Herz trumps alone is risky but still acceptable...
+    # 1 Ober + 1 Unter + 1 Herz trump = 5.5 risk, still below the
+    # threshold and acceptable...
     moderate_trumps = [
+        eichel_ober,
         eichel_unter,
-        herz_sau,
         herz_koenig,
         gruen_seven,
         gruen_eight,
@@ -232,11 +233,11 @@ def test_wants_to_play_ramsch_false_when_blanc_sau_tips_a_trumpy_hand(
     ]
     assert wants_to_play_ramsch(moderate_trumps) is True
 
-    # ...but swapping the harmless Gruen Zehn for a blanc Schellen Sau
-    # tips the same hand into "no".
+    # ...but swapping the harmless Gruen Zehn for a blanc Schellen Sau adds
+    # 2.0 risk (total 7.5) and tips the same hand into "no".
     with_blanc_sau = [
+        eichel_ober,
         eichel_unter,
-        herz_sau,
         herz_koenig,
         gruen_seven,
         gruen_eight,
@@ -245,6 +246,32 @@ def test_wants_to_play_ramsch_false_when_blanc_sau_tips_a_trumpy_hand(
         schellen_sau,
     ]
     assert wants_to_play_ramsch(with_blanc_sau) is False
+
+
+def test_wants_to_play_ramsch_accepts_at_the_threshold(
+    eichel_ober,
+    gruen_ober,
+    herz_koenig,
+    gruen_seven,
+    gruen_eight,
+    gruen_nine,
+    gruen_koenig,
+    schellen_seven,
+):
+    # 2 Ober + 1 Herz trump = 6.0 risk, within the 6.5 threshold the A/B
+    # data shows is still clearly profitable to accept.
+    hand = [
+        eichel_ober,
+        gruen_ober,
+        herz_koenig,
+        gruen_seven,
+        gruen_eight,
+        gruen_nine,
+        gruen_koenig,
+        schellen_seven,
+    ]
+
+    assert wants_to_play_ramsch(hand) is True
 
 
 def test_wants_to_double_game_value_true_for_very_strong_half_hand(

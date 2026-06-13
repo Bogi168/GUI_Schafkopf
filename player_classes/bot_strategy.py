@@ -118,11 +118,13 @@ _RAMSCH_HERZ_TRUMP_RISK = 1.0
 _RAMSCH_BLANC_SAU_RISK = 2.0
 _RAMSCH_BLANC_TEN_RISK = 1.0
 
-# A random 8-card hand carries about one Ober, one Unter and one and a half
-# Herz trumps - around 6.0 risk - which is already too dangerous to want a
-# Ramsch. Only a hand clearly safer than that average should volunteer, so
-# the threshold sits below it.
-_RAMSCH_RISK_THRESHOLD = 5.0
+# Simulated Ramsch outcomes (forcing every Ramsch offer to be accepted,
+# bucketed by the player's own ramsch_risk) stay clearly profitable up to
+# about risk 6.7 (+44 cents at risk 5-6, +14 at 6-7) and only fall off a
+# cliff beyond it (-42 at 7-8). Since declining merely redeals for a fresh,
+# break-even hand, accepting pays whenever the risk is below that crossover.
+# The same "is my hand safe enough" judgement drives Ramsch shooting.
+_RAMSCH_RISK_THRESHOLD = 6.5
 
 _NON_TRUMP_COLORS = (Color.EICHEL, Color.GRUEN, Color.SCHELLEN)
 
