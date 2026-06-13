@@ -6,6 +6,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 from unittest.mock import MagicMock
 
+import pygame
 import pytest
 
 from card_classes.Cards import Color
@@ -212,6 +213,51 @@ def test_draw_bot_seat_with_lamp_does_not_crash(renderer):
     renderer.render_game_mode(game_mode_name=None, chooser=None)
 
     renderer.table_view.draw((0, 0))
+
+
+# ---------------------------------------------------------------------------
+# resizable / fullscreen display scaling
+# ---------------------------------------------------------------------------
+
+
+def test_to_canvas_maps_window_to_canvas_coordinates(renderer):
+    renderer._canvas_scale = 0.5
+    renderer._canvas_offset = (100, 50)
+
+    # The top-left of the drawn area maps to the canvas origin.
+    assert renderer._to_canvas((100, 50)) == (0, 0)
+    # A window point maps back through the offset and scale.
+    assert renderer._to_canvas((300, 150)) == (400, 200)
+
+
+def test_present_letterboxes_and_records_scale(renderer, monkeypatch):
+    monkeypatch.setattr("system.gui.renderer.pygame.display.flip", lambda: None)
+    # A tall window relative to the 1200x800 canvas: width is the limit.
+    renderer._window = pygame.Surface((600, 800))
+
+    renderer._present()
+
+    assert renderer._canvas_scale == pytest.approx(0.5)
+    # Scaled canvas is 600x400, centered vertically in the 800-tall window.
+    assert renderer._canvas_offset == (0, 200)
+
+
+def test_toggle_fullscreen_round_trips(renderer, monkeypatch):
+    calls = []
+    surface = renderer._window
+    monkeypatch.setattr(
+        "system.gui.renderer.pygame.display.set_mode",
+        lambda size, flags=0: calls.append((size, flags)) or surface,
+    )
+
+    assert renderer._fullscreen is False
+    renderer._toggle_fullscreen()
+    assert renderer._fullscreen is True
+    assert calls[-1] == ((0, 0), pygame.FULLSCREEN)
+
+    renderer._toggle_fullscreen()
+    assert renderer._fullscreen is False
+    assert calls[-1] == (renderer._windowed_size, pygame.RESIZABLE)
 
 
 # ---------------------------------------------------------------------------

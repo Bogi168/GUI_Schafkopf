@@ -77,15 +77,28 @@ class GUIRenderer(Renderer):
 
     def __init__(self) -> None:
         pygame.init()
-        self.screen = pygame.display.set_mode((c.WINDOW_WIDTH, c.WINDOW_HEIGHT))
+        # The real OS window can be freely resized or made fullscreen; the
+        # table is always drawn onto a fixed-size logical canvas and then
+        # scaled to fit, so the whole absolute layout stays valid at any size.
+        self._window = pygame.display.set_mode(
+            (c.WINDOW_WIDTH, c.WINDOW_HEIGHT), pygame.RESIZABLE
+        )
+        self.canvas = pygame.Surface((c.WINDOW_WIDTH, c.WINDOW_HEIGHT))
         pygame.display.set_caption("Schafkopf")
         self.clock = pygame.time.Clock()
         self.fonts = c.Fonts()
 
+        # Maps window coordinates to canvas coordinates (set each frame by
+        # _present); identity until the first present.
+        self._canvas_scale = 1.0
+        self._canvas_offset = (0, 0)
+        self._fullscreen = False
+        self._windowed_size = (c.WINDOW_WIDTH, c.WINDOW_HEIGHT)
+
         self.lock = threading.RLock()
         self.state = TableState()
         self.table_view = TableView(
-            screen=self.screen, fonts=self.fonts, state=self.state, lock=self.lock
+            screen=self.canvas, fonts=self.fonts, state=self.state, lock=self.lock
         )
 
         self._seat_index: dict[str, int] = {}
@@ -117,22 +130,63 @@ class GUIRenderer(Renderer):
     def _main_loop(self) -> None:
         running = True
         while running:
-            mouse_pos = pygame.mouse.get_pos()
+            mouse_pos = self._to_canvas(pygame.mouse.get_pos())
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     self._handle_click(mouse_pos)
+                elif event.type == pygame.VIDEORESIZE and not self._fullscreen:
+                    self._window = pygame.display.set_mode(
+                        (event.w, event.h), pygame.RESIZABLE
+                    )
                 elif event.type == pygame.KEYDOWN:
-                    self._handle_key(event)
+                    if event.key == pygame.K_F11:
+                        self._toggle_fullscreen()
+                    else:
+                        self._handle_key(event)
             self.table_view.draw(mouse_pos)
-            pygame.display.flip()
+            self._present()
             self.clock.tick(c.FPS)
             with self.lock:
                 if self._should_quit:
                     running = False
         pygame.quit()
         os._exit(0)
+
+    def _present(self) -> None:
+        """Scales the logical canvas to fit the window (aspect-preserved,
+        letterboxed) and shows it. Records the scale/offset so mouse input
+        can be mapped back to canvas coordinates."""
+
+        win_w, win_h = self._window.get_size()
+        scale = min(win_w / c.WINDOW_WIDTH, win_h / c.WINDOW_HEIGHT)
+        draw_w = max(1, int(c.WINDOW_WIDTH * scale))
+        draw_h = max(1, int(c.WINDOW_HEIGHT * scale))
+        offset = ((win_w - draw_w) // 2, (win_h - draw_h) // 2)
+        self._canvas_scale = scale
+        self._canvas_offset = offset
+
+        self._window.fill(c.BLACK)
+        self._window.blit(pygame.transform.smoothscale(self.canvas, (draw_w, draw_h)), offset)
+        pygame.display.flip()
+
+    def _to_canvas(self, pos: tuple[int, int]) -> tuple[int, int]:
+        """Maps a window-space position to canvas-space."""
+
+        if self._canvas_scale <= 0:
+            return pos
+        x = (pos[0] - self._canvas_offset[0]) / self._canvas_scale
+        y = (pos[1] - self._canvas_offset[1]) / self._canvas_scale
+        return (int(x), int(y))
+
+    def _toggle_fullscreen(self) -> None:
+        self._fullscreen = not self._fullscreen
+        if self._fullscreen:
+            self._windowed_size = self._window.get_size()
+            self._window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        else:
+            self._window = pygame.display.set_mode(self._windowed_size, pygame.RESIZABLE)
 
     # ------------------------------------------------------------------
     # seat assignment
