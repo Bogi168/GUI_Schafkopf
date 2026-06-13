@@ -20,6 +20,7 @@ from system.gui.state import (
     PendingRequest,
     PlayedCardEntry,
     SwapAnimation,
+    TrickCollectAnimation,
 )
 from system.gui.widgets import wrap_text
 from system.Renderer import ColorChoiceKind, GameResult, YesNoKind
@@ -316,6 +317,75 @@ def test_draw_card_slide_does_not_crash(renderer, eichel_sau):
             seat=seat, card=eichel_sau, start_time=time.time(), duration=0.22
         )
         renderer.table_view.draw((0, 0))
+
+
+# ---------------------------------------------------------------------------
+# trick-collect animation
+# ---------------------------------------------------------------------------
+
+
+def test_render_trick_winner_collects_then_clears(
+    renderer, players, eichel_sau, gruen_sau, herz_sau, schellen_sau, monkeypatch
+):
+    entries = [
+        PlayedCardEntry(seat=0, card=eichel_sau),
+        PlayedCardEntry(seat=1, card=gruen_sau),
+        PlayedCardEntry(seat=2, card=herz_sau),
+        PlayedCardEntry(seat=3, card=schellen_sau),
+    ]
+    renderer.state.center_cards = list(entries)
+    captured = []
+    monkeypatch.setattr(
+        "system.gui.renderer.time.sleep",
+        lambda *_args: captured.append(renderer.state.trick_collect),
+    )
+
+    renderer.render_trick_winner(winner=players[2])  # seat TOP
+
+    # No collect during the winner-highlight sleep; set during the collect
+    # sleep, aimed at the winner's seat.
+    assert captured[0] is None
+    assert captured[1] is not None
+    assert captured[1].winner_seat == c.TOP
+    # Afterwards the trick is cleared into the previous-round store.
+    assert renderer.state.trick_collect is None
+    assert renderer.state.center_cards == []
+    assert renderer.state.previous_round_cards == entries
+    assert renderer.state.trick_winner_seat is None
+
+
+def test_draw_center_during_collect_does_not_crash(
+    renderer, eichel_sau, gruen_sau, herz_sau, schellen_sau
+):
+    renderer.state.center_cards = [
+        PlayedCardEntry(seat=0, card=eichel_sau),
+        PlayedCardEntry(seat=1, card=gruen_sau),
+        PlayedCardEntry(seat=2, card=herz_sau),
+        PlayedCardEntry(seat=3, card=schellen_sau),
+    ]
+    for seat in (c.BOTTOM, c.LEFT, c.TOP, c.RIGHT):
+        renderer.state.trick_collect = TrickCollectAnimation(
+            winner_seat=seat, start_time=time.time(), duration=0.35
+        )
+        renderer.table_view.draw((0, 0))
+
+
+def test_render_game_result_clears_trick_collect(renderer, players):
+    renderer.state.trick_collect = TrickCollectAnimation(
+        winner_seat=c.TOP, start_time=time.time(), duration=0.35
+    )
+
+    renderer.render_game_result(
+        result=GameResult(
+            most_point_teams=[],
+            winners=[],
+            game_value=0,
+            game_value_breakdown="",
+            players=players,
+        )
+    )
+
+    assert renderer.state.trick_collect is None
 
 
 # ---------------------------------------------------------------------------

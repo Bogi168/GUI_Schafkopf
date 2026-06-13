@@ -29,6 +29,7 @@ from system.gui.state import (
     PlayedCardEntry,
     SwapAnimation,
     TableState,
+    TrickCollectAnimation,
 )
 from system.gui.table_view import TableView
 from system.text import (
@@ -67,6 +68,8 @@ _SHUFFLE_DURATION = 1.0
 _DEAL_CARD_DURATION = 0.12
 _SWAP_CARD_DURATION = 0.9
 _PLAY_SLIDE_DURATION = 0.22
+_TRICK_WINNER_HIGHLIGHT = 1.0
+_TRICK_COLLECT_DURATION = 0.35
 
 
 class GUIRenderer(Renderer):
@@ -247,11 +250,20 @@ class GUIRenderer(Renderer):
         seat = self._ensure_seat(winner)
         with self.lock:
             self.state.trick_winner_seat = seat
-        time.sleep(1.0)
+        time.sleep(_TRICK_WINNER_HIGHLIGHT)
+        # Sweep the trick's cards into the winner's pile before clearing.
+        with self.lock:
+            self.state.trick_collect = TrickCollectAnimation(
+                winner_seat=seat,
+                start_time=time.time(),
+                duration=_TRICK_COLLECT_DURATION,
+            )
+        time.sleep(_TRICK_COLLECT_DURATION)
         with self.lock:
             self.state.previous_round_cards = list(self.state.center_cards)
             self.state.center_cards.clear()
             self.state.trick_winner_seat = None
+            self.state.trick_collect = None
 
     def render_game_mode(
         self,
@@ -287,6 +299,7 @@ class GUIRenderer(Renderer):
             self.state.center_cards.clear()
             self.state.trick_winner_seat = None
             self.state.active_seat = None
+            self.state.trick_collect = None
             self.state.message = ""
             # The hand is over - the "show last round" button must not offer
             # this hand's last trick while the player is asked to play again.

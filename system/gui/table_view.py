@@ -242,8 +242,20 @@ class TableView:
             self._current_card_rects = rects
 
     def _draw_center(self) -> None:
+        collect = self.state.trick_collect
+        target = None
+        eased = 0.0
+        if collect is not None:
+            progress = min(1.0, (time.time() - collect.start_time) / collect.duration)
+            eased = progress * progress  # accelerate as the cards sweep away
+            target = self._deal_target(collect.winner_seat)
         for entry in self.state.center_cards:
             rect = self._center_card_rect(entry.seat)
+            if target is not None:
+                rect = rect.move(
+                    int((target[0] - rect.centerx) * eased),
+                    int((target[1] - rect.centery) * eased),
+                )
             draw_card_face(self.screen, rect, entry.card, self.fonts)
 
     def _draw_shuffle(self) -> None:

@@ -54,6 +54,15 @@ class CardSlideAnimation:
 
 
 @dataclass
+class TrickCollectAnimation:
+    """The finished trick's cards sweeping from the center to the winner."""
+
+    winner_seat: int
+    start_time: float
+    duration: float
+
+
+@dataclass
 class PendingRequest:
     """A blocking request for input from the human player."""
 
@@ -105,5 +114,8 @@ class TableState:
     # A played card in flight from its seat to the center, written by
     # render_played_card while it slides in (before it joins center_cards).
     sliding_card: CardSlideAnimation | None = None
+    # The finished trick sweeping to the winner, written by
+    # render_trick_winner; while set, the center cards animate toward them.
+    trick_collect: TrickCollectAnimation | None = None
     # Set by GUIRenderer._run_game if the game-logic thread crashes.
     game_error: str | None = None
