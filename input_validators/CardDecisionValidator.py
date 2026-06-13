@@ -244,10 +244,18 @@ class SauspielCardDecisionValidator(RegularTrumpTypeCardDecisionValidator):
         player_cards: list[Card],
         trumps: list[Card],
     ) -> bool:
+        # Only a suit lead of the called colour seeks the Sau. A trump lead
+        # that happens to share the colour (e.g. the Eichel Ober when the
+        # Eichel Sau is called) does not, so the Sau may not be played on
+        # it either.
+        lead_seeks_sau = (
+            lead_card not in trumps
+            and lead_card.card_color == self.call_sau.card_color
+        )
         if (
             not self.ran_away
             and self.is_player_owns_call_sau(player_cards=player_cards)
-            and lead_card.card_color != self.call_sau.card_color
+            and not lead_seeks_sau
             and decision == self.call_sau
         ):
             return False

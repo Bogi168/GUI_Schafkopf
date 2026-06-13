@@ -310,7 +310,11 @@ def _call_sau_owner_forced_this_trick(context: CardPlayContext, lead_card: Card)
     if _call_sau_ran_away(context):
         return False
 
-    return lead_card.card_color == call_sau.card_color and lead_card != call_sau
+    return (
+        lead_card not in context.trumps
+        and lead_card.card_color == call_sau.card_color
+        and lead_card != call_sau
+    )
 
 
 def choose_card_to_play(

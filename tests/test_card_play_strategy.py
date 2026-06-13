@@ -1603,3 +1603,22 @@ def test_lead_tout_chooser_keeps_draining_with_boss_trump(
     result = choose_card_to_play(player, [eichel_ober, gruen_ober, eichel_sau], context)
 
     assert result == eichel_ober
+
+
+def test_follow_does_not_chase_the_sau_on_a_trump_lead_of_call_color(
+    gruen_sau, gruen_ober, eichel_ober, schellen_unter, sauspiel_trumps
+):
+    player = _FakePlayer(player_cards=[eichel_ober, schellen_unter])
+    # The teammate led the Gruen Ober - a trump that shares the call color
+    # but does not force the Gruen Sau out. Overtaking the teammate's
+    # near-boss trump for a 3-point trick would just burn the Eichel Ober.
+    context = _context(
+        current_trick=[("teammate", gruen_ober)],
+        trumps=sauspiel_trumps,
+        call_sau=gruen_sau,
+        teammates=["teammate"],
+    )
+
+    result = choose_card_to_play(player, [eichel_ober, schellen_unter], context)
+
+    assert result == schellen_unter

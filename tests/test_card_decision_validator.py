@@ -702,3 +702,37 @@ def test_card_swap_not_implemented_by_default(eichel_sau):
 
     with pytest.raises(NotImplementedError):
         validator.is_card_swap_legal(decision=eichel_sau, is_game_chooser=True)
+
+
+def test_call_sau_cannot_be_played_on_trump_lead_of_call_color(
+    sauspiel_trumps,
+    eichel_sau,
+    eichel_ober,
+    eichel_nine,
+    gruen_eight,
+    schellen_seven,
+):
+    validator = SauspielCardDecisionValidator(call_sau=eichel_sau)
+    # The Eichel Ober is a trump - it does not seek the Eichel Sau. The
+    # trump-void owner may discard anything except the Sau.
+    lead_card = eichel_ober
+    player_cards = [eichel_sau, eichel_nine, gruen_eight, schellen_seven]
+
+    assert not validator.is_move_legal(
+        decision=eichel_sau,
+        lead_card=lead_card,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
+    assert validator.is_move_legal(
+        decision=gruen_eight,
+        lead_card=lead_card,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
+    assert validator.is_move_legal(
+        decision=eichel_nine,
+        lead_card=lead_card,
+        player_cards=player_cards,
+        trumps=sauspiel_trumps,
+    )
