@@ -215,6 +215,30 @@ def test_draw_bot_seat_with_lamp_does_not_crash(renderer):
 
 
 # ---------------------------------------------------------------------------
+# fonts
+# ---------------------------------------------------------------------------
+
+
+def test_fonts_load_and_render_with_fallback_list(renderer):
+    # Every font slot loads (falling back to pygame's bundled default if none
+    # of the preferred system fonts exist) and renders visible text.
+    fonts = renderer.fonts
+    for font in (
+        fonts.announcement,
+        fonts.title,
+        fonts.heading,
+        fonts.body,
+        fonts.small,
+        fonts.card_type,
+        fonts.button,
+        fonts.name,
+    ):
+        surface = font.render("Schafkopf", True, c.TEXT_DARK)
+        assert surface.get_width() > 0
+        assert surface.get_height() > 0
+
+
+# ---------------------------------------------------------------------------
 # whose-turn indicator
 # ---------------------------------------------------------------------------
 

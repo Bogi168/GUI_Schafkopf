@@ -120,15 +120,22 @@ SUIT_COLORS: dict[Color, tuple[int, int, int]] = {
 }
 
 
+# Font preference list, tried in order. pygame.font.SysFont falls back to its
+# bundled default font (freesansbold.ttf, shipped with pygame) when none of
+# these are installed, so text always renders the same regardless of which
+# system fonts a machine happens to have - no silent reliance on "arial".
+FONT_NAMES = "arial,helvetica,liberationsans,dejavusans,freesans,sans"
+
+
 class Fonts:
     """Holds the fonts used by the GUI. Must be created after pygame.font.init()."""
 
     def __init__(self) -> None:
-        self.announcement = pygame.font.SysFont("arial", 46, bold=True)
-        self.title = pygame.font.SysFont("arial", 34, bold=True)
-        self.heading = pygame.font.SysFont("arial", 24, bold=True)
-        self.body = pygame.font.SysFont("arial", 20)
-        self.small = pygame.font.SysFont("arial", 15)
-        self.card_type = pygame.font.SysFont("arial", 18, bold=True)
-        self.button = pygame.font.SysFont("arial", 19, bold=True)
-        self.name = pygame.font.SysFont("arial", 19, bold=True)
+        self.announcement = pygame.font.SysFont(FONT_NAMES, 46, bold=True)
+        self.title = pygame.font.SysFont(FONT_NAMES, 34, bold=True)
+        self.heading = pygame.font.SysFont(FONT_NAMES, 24, bold=True)
+        self.body = pygame.font.SysFont(FONT_NAMES, 20)
+        self.small = pygame.font.SysFont(FONT_NAMES, 15)
+        self.card_type = pygame.font.SysFont(FONT_NAMES, 18, bold=True)
+        self.button = pygame.font.SysFont(FONT_NAMES, 19, bold=True)
+        self.name = pygame.font.SysFont(FONT_NAMES, 19, bold=True)
