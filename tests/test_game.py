@@ -415,3 +415,17 @@ def test_play_game_calls_pipeline_steps_in_order(fake_game):
     assert fake_game.round_manager is manager
     assert fake_game.amount_game_value_doubles == 1 + 2
     assert fake_game.active_team == "the_active_team"
+
+
+def test_sort_player_hands_rerenders_each_sorted_hand(
+    fake_game, eichel_sau, eichel_seven, herz_ober
+):
+    p1 = fake_game.players[0]
+    p1.player_cards = [eichel_seven, herz_ober, eichel_sau]
+
+    fake_game.sort_player_hands()
+
+    calls = fake_game.renderer.render_hand.call_args_list
+    assert len(calls) == len(fake_game.players)
+    assert calls[0].kwargs["player"] is p1
+    assert calls[0].kwargs["cards"] == p1.player_cards

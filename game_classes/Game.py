@@ -155,7 +155,9 @@ class Game(ABC):
 
     def sort_player_hands(self) -> None:
         """
-        Sorts the cards of the players according to their power in the game.
+        Sorts the cards of the players according to their power in the game
+        and re-renders the hands, so the new order shows the moment the
+        game mode is settled rather than on each player's next turn.
         :return: None
         """
 
@@ -163,6 +165,7 @@ class Game(ABC):
             player.player_cards.sort(
                 key=self.card_power_calculator.get_card_power, reverse=True
             )
+            self.renderer.render_hand(player=player, cards=player.player_cards)
 
     def play_rounds(
         self, round_manager: RoundManager, game_chooser: Player | None = None
