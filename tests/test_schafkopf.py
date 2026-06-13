@@ -20,6 +20,10 @@ from system.text import words_of_thanks, no_game_phrase
 def schafkopf() -> Schafkopf:
     renderer = MagicMock()
     renderer.ask_yes_no.return_value = False
+    # The settings step keeps whatever prices Schafkopf was built with.
+    renderer.ask_prices.side_effect = (
+        lambda base_price, call_price, alone_price: (base_price, call_price, alone_price)
+    )
     game = Schafkopf(renderer=renderer, base_price=10, call_price=20, alone_price=30)
     game.players = [
         Player(
@@ -444,6 +448,26 @@ def test_main_single_iteration_with_game_plays_it(schafkopf, monkeypatch):
         detail_color=None,
     )
     renderer.render_farewell.assert_called_once_with(message=words_of_thanks)
+
+
+def test_main_applies_prices_from_renderer(schafkopf, monkeypatch):
+    renderer = schafkopf.renderer
+    renderer.ask_play_again.return_value = False
+    renderer.ask_prices.side_effect = None
+    renderer.ask_prices.return_value = (7, 14, 21)
+    starter = schafkopf.players[0]
+
+    monkeypatch.setattr(schafkopf, "_create_players", lambda: schafkopf.players)
+    monkeypatch.setattr(schafkopf, "prepare_players", lambda: None)
+    monkeypatch.setattr(schafkopf, "prepare_cards", lambda: None)
+    monkeypatch.setattr(schafkopf, "players_choose_game", lambda: None)
+    monkeypatch.setattr(schafkopf, "get_new_starter", lambda prev_starter_index: starter)
+    for player in schafkopf.players:
+        monkeypatch.setattr(player, "ask_want_choose_game", lambda **kwargs: False)
+
+    schafkopf.main()
+
+    assert (schafkopf.base_price, schafkopf.call_price, schafkopf.alone_price) == (7, 14, 21)
 
 
 def test_get_hochzeit_partner_renders_search_and_decisions(schafkopf, monkeypatch):

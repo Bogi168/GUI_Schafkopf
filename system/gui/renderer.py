@@ -468,15 +468,37 @@ class GUIRenderer(Renderer):
     def ask_player_name(self) -> str:
         return self._request(kind="player_name", title="Enter your name")
 
-    def ask_play_again(self) -> bool:
-        result: bool = self._request(
-            kind="play_again",
-            options=[("Play again", True), ("Quit", False)],
+    def ask_prices(
+        self, base_price: int, call_price: int, alone_price: int
+    ) -> tuple[int, int, int]:
+        with self.lock:
+            self.state.settings_prices = {
+                "Base": base_price,
+                "Call": call_price,
+                "Alone": alone_price,
+            }
+        prices: dict[str, int] = self._request(
+            kind="prices", title="Set the stakes (cents)"
         )
+        with self.lock:
+            self.state.settings_prices = None
+        return (prices["Base"], prices["Call"], prices["Alone"])
+
+    def ask_play_again(self) -> bool:
+        result = self._request(
+            kind="play_again",
+            options=[("Play again", "again"), ("New match", "new"), ("Quit", "quit")],
+        )
+        if result == "new":
+            # Reset everyone's balance for a fresh match.
+            with self.lock:
+                for player in self.state.seat_players:
+                    if player is not None:
+                        player.money = 0
         with self.lock:
             self.state.game_result = None
             self.state.message = ""
-        return result
+        return result in ("again", "new")
 
     def ask_yes_no(self, player: Player, kind: YesNoKind, allow_yes: bool = True) -> bool:
         prompt = _YES_NO_PROMPTS[kind](player.player_name)
@@ -566,6 +588,25 @@ class GUIRenderer(Renderer):
     # ------------------------------------------------------------------
     def _handle_click(self, pos: tuple[int, int]) -> None:
         hit_test = self.table_view.hit_test()
+
+        # The in-game menu, when open, captures all clicks.
+        with self.lock:
+            menu_open = self.state.menu_open
+        if menu_open:
+            for button in hit_test.menu_buttons:
+                if button.is_clicked(pos):
+                    if button.value == "quit":
+                        with self.lock:
+                            self._should_quit = True
+                    with self.lock:
+                        self.state.menu_open = False
+                    return
+            return
+        if hit_test.menu_button is not None and hit_test.menu_button.is_clicked(pos):
+            with self.lock:
+                self.state.menu_open = True
+            return
+
         previous_round_button = hit_test.previous_round_button
         if previous_round_button is not None and previous_round_button.is_clicked(pos):
             with self.lock:
@@ -600,16 +641,44 @@ class GUIRenderer(Renderer):
                     return
             return
 
+        if pending.kind == "prices":
+            self._handle_prices_click(pos, hit_test.buttons)
+            return
+
         for button in hit_test.buttons:
             if button.is_clicked(pos):
                 self._submit(button.value)
                 return
 
+    def _handle_prices_click(self, pos: tuple[int, int], buttons: list) -> None:
+        for button in buttons:
+            if not button.is_clicked(pos):
+                continue
+            if button.value == "start_game":
+                with self.lock:
+                    prices = dict(self.state.settings_prices or {})
+                self._submit(prices)
+            else:
+                _, key, delta = button.value
+                with self.lock:
+                    if self.state.settings_prices is not None:
+                        current = self.state.settings_prices[key]
+                        self.state.settings_prices[key] = max(
+                            c.STAKE_MIN, min(c.STAKE_MAX, current + delta)
+                        )
+            return
+
     def _handle_key(self, event: pygame.event.Event) -> None:
+        if event.key == pygame.K_ESCAPE:
+            with self.lock:
+                self.state.menu_open = not self.state.menu_open
+            return
+
         with self.lock:
+            menu_open = self.state.menu_open
             pending = self.state.pending
 
-        if pending is None:
+        if menu_open or pending is None:
             return
 
         if pending.kind == "card":

@@ -202,6 +202,11 @@ class Schafkopf:
     def main(self) -> None:
         self.players = self._create_players()
         self.renderer.set_players(self.players)
+        self.base_price, self.call_price, self.alone_price = self.renderer.ask_prices(
+            base_price=self.base_price,
+            call_price=self.call_price,
+            alone_price=self.alone_price,
+        )
         self.starter: Player = random.choice(self.players)
         while True:
             self.prepare_players()

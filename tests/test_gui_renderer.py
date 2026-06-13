@@ -216,6 +216,131 @@ def test_draw_bot_seat_with_lamp_does_not_crash(renderer):
 
 
 # ---------------------------------------------------------------------------
+# pre-game stakes settings screen
+# ---------------------------------------------------------------------------
+
+
+def test_prices_steppers_adjust_and_start_submits(renderer):
+    renderer.state.settings_prices = {"Base": 10, "Call": 20, "Alone": 30}
+    renderer.state.pending = PendingRequest(kind="prices", title="Set the stakes (cents)")
+    renderer.table_view.draw((0, 0))
+    buttons = {b.value: b for b in renderer.table_view.hit_test().buttons}
+
+    # Two +5 steps raise Base from 10 to 20.
+    renderer._handle_click(buttons[("price", "Base", 5)].rect.center)
+    renderer._handle_click(buttons[("price", "Base", 5)].rect.center)
+    assert renderer.state.settings_prices["Base"] == 20
+
+    # Start submits the current stakes.
+    renderer._handle_click(buttons["start_game"].rect.center)
+    assert renderer._input_result == {"Base": 20, "Call": 20, "Alone": 30}
+    assert renderer.state.pending is None
+
+
+def test_prices_stepper_clamps_to_minimum(renderer):
+    renderer.state.settings_prices = {"Base": c.STAKE_MIN, "Call": 20, "Alone": 30}
+    renderer.state.pending = PendingRequest(kind="prices")
+    renderer.table_view.draw((0, 0))
+    buttons = {b.value: b for b in renderer.table_view.hit_test().buttons}
+
+    renderer._handle_click(buttons[("price", "Base", -5)].rect.center)
+
+    assert renderer.state.settings_prices["Base"] == c.STAKE_MIN
+
+
+# ---------------------------------------------------------------------------
+# in-game menu
+# ---------------------------------------------------------------------------
+
+
+def test_menu_button_opens_menu(renderer):
+    renderer.table_view.draw((0, 0))
+
+    renderer._handle_click(c.MENU_BUTTON_RECT.center)
+
+    assert renderer.state.menu_open is True
+
+
+def test_menu_resume_closes_menu(renderer):
+    renderer.state.menu_open = True
+    renderer.table_view.draw((0, 0))
+    buttons = {b.value: b for b in renderer.table_view.hit_test().menu_buttons}
+
+    renderer._handle_click(buttons["resume"].rect.center)
+
+    assert renderer.state.menu_open is False
+
+
+def test_menu_quit_requests_shutdown(renderer):
+    renderer.state.menu_open = True
+    renderer.table_view.draw((0, 0))
+    buttons = {b.value: b for b in renderer.table_view.hit_test().menu_buttons}
+
+    renderer._handle_click(buttons["quit"].rect.center)
+
+    assert renderer._should_quit is True
+    assert renderer.state.menu_open is False
+
+
+def test_escape_key_toggles_menu(renderer):
+    event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)
+
+    renderer._handle_key(event)
+    assert renderer.state.menu_open is True
+
+    renderer._handle_key(event)
+    assert renderer.state.menu_open is False
+
+
+def test_open_menu_swallows_other_clicks(renderer, eichel_sau):
+    # A card play is pending, but the menu is open: clicking a card must not
+    # submit it.
+    renderer.state.human_hand = [eichel_sau]
+    renderer.state.pending = PendingRequest(kind="card", legal_mask=[True])
+    renderer.state.menu_open = True
+    renderer.table_view.draw((0, 0))
+    card_rect = renderer.table_view._hand_card_rects(1)[0]
+
+    renderer._input_result = "untouched"
+    renderer._handle_click(card_rect.center)
+
+    assert renderer._input_result == "untouched"
+
+
+# ---------------------------------------------------------------------------
+# new-match reset on the play-again screen
+# ---------------------------------------------------------------------------
+
+
+def test_ask_play_again_new_match_resets_money(renderer, players, monkeypatch):
+    for player in players:
+        player.money = 50
+    monkeypatch.setattr(renderer, "_request", lambda **_kwargs: "new")
+
+    result = renderer.ask_play_again()
+
+    assert result is True
+    assert all(player.money == 0 for player in players)
+
+
+def test_ask_play_again_quit_returns_false(renderer, monkeypatch):
+    monkeypatch.setattr(renderer, "_request", lambda **_kwargs: "quit")
+
+    assert renderer.ask_play_again() is False
+
+
+def test_ask_play_again_play_again_keeps_money(renderer, players, monkeypatch):
+    for player in players:
+        player.money = 50
+    monkeypatch.setattr(renderer, "_request", lambda **_kwargs: "again")
+
+    result = renderer.ask_play_again()
+
+    assert result is True
+    assert all(player.money == 50 for player in players)
+
+
+# ---------------------------------------------------------------------------
 # resizable / fullscreen display scaling
 # ---------------------------------------------------------------------------
 

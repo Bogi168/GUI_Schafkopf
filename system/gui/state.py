@@ -104,6 +104,11 @@ class TableState:
     game_choice_lamps: dict[int, str] = field(default_factory=dict)
     game_result: GameResult | None = None
     pending: PendingRequest | None = None
+    # Whether the in-game menu overlay (Resume / Quit) is open.
+    menu_open: bool = False
+    # Working stake values while the pre-game settings screen is shown,
+    # keyed by label ("Base"/"Call"/"Alone"); None when not on that screen.
+    settings_prices: dict[str, int] | None = None
     # Card-dealing animation state, written by render_shuffle_cards /
     # render_deal_cards and read by the draw loop.
     shuffle_start_time: float | None = None

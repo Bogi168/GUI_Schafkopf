@@ -64,6 +64,14 @@ SEAT_HAND_ORIENTATION = {
 # Toggle button for viewing the cards played in the previous round
 PREVIOUS_ROUND_BUTTON_RECT = pygame.Rect(30, WINDOW_HEIGHT - 74, 170, 44)
 
+# In-game menu button (top-right corner)
+MENU_BUTTON_RECT = pygame.Rect(WINDOW_WIDTH - 140, 30, 110, 40)
+
+# Stakes that can be set on the pre-game settings screen: (label, step).
+STAKE_FIELDS = (("Base", 5), ("Call", 5), ("Alone", 5))
+STAKE_MIN = 5
+STAKE_MAX = 500
+
 # Colors
 TABLE_GREEN = (21, 88, 54)
 TABLE_GREEN_DARK = (15, 68, 42)

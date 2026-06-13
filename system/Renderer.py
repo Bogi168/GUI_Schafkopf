@@ -167,6 +167,15 @@ class Renderer(ABC):
     ) -> None:
         pass
 
+    def ask_prices(
+        self, base_price: int, call_price: int, alone_price: int
+    ) -> tuple[int, int, int]:
+        """Lets the player set the stakes before the match starts. The
+        default implementation keeps the given prices, so renderers without
+        a settings screen (e.g. the console) are unaffected."""
+
+        return (base_price, call_price, alone_price)
+
     @abstractmethod
     def ask_player_name(self) -> str:
         pass

@@ -38,6 +38,8 @@ class HitTestTargets(NamedTuple):
     buttons: list[Button]
     card_rects: list[pygame.Rect]
     previous_round_button: Button | None
+    menu_button: Button | None = None
+    menu_buttons: list[Button] = []
 
 
 class TableView:
@@ -58,6 +60,8 @@ class TableView:
         self._current_buttons: list[Button] = []
         self._current_card_rects: list[pygame.Rect] = []
         self._previous_round_button: Button | None = None
+        self._menu_button: Button | None = None
+        self._menu_buttons: list[Button] = []
         self._text_input = TextInput(rect=pygame.Rect(0, 0, 1, 1))
 
     def hit_test(self) -> HitTestTargets:
@@ -67,6 +71,8 @@ class TableView:
             buttons=self._current_buttons,
             card_rects=self._current_card_rects,
             previous_round_button=self._previous_round_button,
+            menu_button=self._menu_button,
+            menu_buttons=self._menu_buttons,
         )
 
     @staticmethod
@@ -94,6 +100,8 @@ class TableView:
     def draw(self, mouse_pos: tuple[int, int]) -> None:
         self._current_buttons = []
         self._current_card_rects = []
+        self._menu_button = None
+        self._menu_buttons = []
         with self.lock:
             self.screen.fill(c.TABLE_GREEN)
             pygame.draw.rect(
@@ -131,6 +139,12 @@ class TableView:
             self._draw_previous_round_button(mouse_pos)
             if self.state.game_error:
                 self._draw_error(self.state.game_error)
+            # The menu button stays available on top of everything; the menu
+            # overlay, when open, sits above that.
+            if not self.state.is_farewell:
+                self._draw_menu_button(mouse_pos)
+            if self.state.menu_open:
+                self._draw_menu_overlay(mouse_pos)
 
     def _draw_bot_seat(self, seat: int, mouse_pos: tuple[int, int]) -> None:
         avatar_pos = c.SEAT_AVATAR_POS[seat]
@@ -520,8 +534,83 @@ class TableView:
 
         if pending.kind == "player_name":
             self._draw_player_name_panel()
+        elif pending.kind == "prices":
+            self._draw_prices_panel(mouse_pos)
         else:
             self._draw_choice_panel(pending, mouse_pos)
+
+    def _draw_prices_panel(self, mouse_pos: tuple[int, int]) -> None:
+        prices = self.state.settings_prices or {}
+        panel_rect = pygame.Rect(0, 0, 460, 90 + len(c.STAKE_FIELDS) * 60 + 80)
+        panel_rect.center = (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2)
+        pygame.draw.rect(self.screen, c.PANEL_BG, panel_rect, border_radius=12)
+        pygame.draw.rect(self.screen, c.PANEL_BORDER, panel_rect, width=2, border_radius=12)
+
+        title = self.fonts.heading.render("Set the stakes (cents)", True, c.TEXT_DARK)
+        self.screen.blit(title, title.get_rect(midtop=(panel_rect.centerx, panel_rect.top + 22)))
+
+        y = panel_rect.top + 80
+        for label, step in c.STAKE_FIELDS:
+            label_surf = self.fonts.body.render(label, True, c.TEXT_DARK)
+            self.screen.blit(label_surf, label_surf.get_rect(midleft=(panel_rect.left + 30, y + 20)))
+
+            minus = Button(
+                rect=pygame.Rect(panel_rect.right - 200, y, 40, 40),
+                label="-",
+                value=("price", label, -step),
+            )
+            plus = Button(
+                rect=pygame.Rect(panel_rect.right - 70, y, 40, 40),
+                label="+",
+                value=("price", label, step),
+            )
+            minus.draw(self.screen, self.fonts, mouse_pos)
+            plus.draw(self.screen, self.fonts, mouse_pos)
+            self._current_buttons.extend((minus, plus))
+
+            value_surf = self.fonts.heading.render(str(prices.get(label, 0)), True, c.TEXT_DARK)
+            self.screen.blit(value_surf, value_surf.get_rect(center=(panel_rect.right - 130, y + 20)))
+            y += 60
+
+        start = Button(
+            rect=pygame.Rect(panel_rect.centerx - 90, panel_rect.bottom - 60, 180, 44),
+            label="Start game",
+            value="start_game",
+        )
+        start.draw(self.screen, self.fonts, mouse_pos)
+        self._current_buttons.append(start)
+
+    def _draw_menu_button(self, mouse_pos: tuple[int, int]) -> None:
+        button = Button(rect=c.MENU_BUTTON_RECT, label="Menu", value="open_menu")
+        button.draw(self.screen, self.fonts, mouse_pos)
+        self._menu_button = button
+
+    def _draw_menu_overlay(self, mouse_pos: tuple[int, int]) -> None:
+        overlay = pygame.Surface((c.WINDOW_WIDTH, c.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((*c.OVERLAY_COLOR, c.OVERLAY_ALPHA))
+        self.screen.blit(overlay, (0, 0))
+
+        panel_rect = pygame.Rect(0, 0, 320, 220)
+        panel_rect.center = (c.WINDOW_WIDTH // 2, c.WINDOW_HEIGHT // 2)
+        pygame.draw.rect(self.screen, c.PANEL_BG, panel_rect, border_radius=12)
+        pygame.draw.rect(self.screen, c.PANEL_BORDER, panel_rect, width=2, border_radius=12)
+
+        title = self.fonts.title.render("Menu", True, c.TEXT_DARK)
+        self.screen.blit(title, title.get_rect(midtop=(panel_rect.centerx, panel_rect.top + 24)))
+
+        resume = Button(
+            rect=pygame.Rect(panel_rect.centerx - 90, panel_rect.top + 90, 180, 44),
+            label="Resume",
+            value="resume",
+        )
+        quit_button = Button(
+            rect=pygame.Rect(panel_rect.centerx - 90, panel_rect.top + 144, 180, 44),
+            label="Quit",
+            value="quit",
+        )
+        resume.draw(self.screen, self.fonts, mouse_pos)
+        quit_button.draw(self.screen, self.fonts, mouse_pos)
+        self._menu_buttons = [resume, quit_button]
 
     def _draw_choice_panel(self, pending: PendingRequest, mouse_pos: tuple[int, int]) -> None:
         amount = len(pending.options)
