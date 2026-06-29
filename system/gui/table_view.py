@@ -569,7 +569,7 @@ class TableView:
             self._current_buttons.extend((minus, plus))
 
             value_surf = self.fonts.heading.render(str(prices.get(label, 0)), True, c.TEXT_DARK)
-            self.screen.blit(value_surf, value_surf.get_rect(center=(panel_rect.right - 130, y + 20)))
+            self.screen.blit(value_surf, value_surf.get_rect(center=(panel_rect.right - 115, y + 20)))
             y += 60
 
         start = Button(
