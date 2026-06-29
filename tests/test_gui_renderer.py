@@ -415,14 +415,15 @@ def test_fonts_load_and_render_with_fallback_list(renderer):
 
 
 def test_render_played_card_marks_bot_seat_active_then_clears(
-    renderer, eichel_sau, monkeypatch
+    renderer, players, eichel_sau, monkeypatch
 ):
-    # A real Bot whose name matches the seat-1 (LEFT) registration.
+    # A real Bot seated at seat 1 (LEFT); only bots get the "thinking" delay.
     bot = Bot(
         bot_name="Testplayer 2",
         renderer=MagicMock(),
         game_decision_validator=MagicMock(),
     )
+    renderer.set_players([players[0], bot, players[2], players[3]])
     captured = []
     monkeypatch.setattr(
         "system.gui.renderer.time.sleep",
@@ -435,6 +436,24 @@ def test_render_played_card_marks_bot_seat_active_then_clears(
     # the card slides in (second sleep) the turn highlight is already off.
     assert captured[0] == c.LEFT
     assert renderer.state.active_seat is None
+
+
+def test_seats_keyed_by_identity_not_name(player_1, player_3, player_4, monkeypatch):
+    # The human may pick a name that collides with a bot ("Bot 1"); seats
+    # must still be assigned per player object, not per name.
+    monkeypatch.setattr("system.gui.renderer.time.sleep", lambda *_args: None)
+    gui_renderer = GUIRenderer()
+    human = player_1
+    human.player_name = "Bot 1"
+    bot = Bot(
+        bot_name="Bot 1",
+        renderer=MagicMock(),
+        game_decision_validator=MagicMock(),
+    )
+    gui_renderer.set_players([human, bot, player_3, player_4])
+
+    assert gui_renderer._ensure_seat(human) == c.BOTTOM
+    assert gui_renderer._ensure_seat(bot) == c.LEFT
 
 
 def test_ask_card_marks_human_seat_active(renderer, player_1, monkeypatch):

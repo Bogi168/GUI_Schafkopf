@@ -101,7 +101,7 @@ class GUIRenderer(Renderer):
             screen=self.canvas, fonts=self.fonts, state=self.state, lock=self.lock
         )
 
-        self._seat_index: dict[str, int] = {}
+        self._seat_index: dict[int, int] = {}
 
         self._input_event = threading.Event()
         self._input_result: Any = None
@@ -201,14 +201,14 @@ class GUIRenderer(Renderer):
         ordered = players[human_idx:] + players[:human_idx]
         with self.lock:
             for i, p in enumerate(ordered):
-                self._seat_index[p.player_name] = i
+                self._seat_index[id(p)] = i
                 self.state.seat_names[i] = p.player_name
                 self.state.seat_players[i] = p
 
     def _ensure_seat(self, player: Player) -> int:
         """Returns the fixed seat index for a player (set up by set_players)."""
 
-        return self._seat_index[player.player_name]
+        return self._seat_index[id(player)]
 
     # ------------------------------------------------------------------
     # Renderer interface - render_* (called from the game thread)
